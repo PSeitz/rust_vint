@@ -6,3 +6,10 @@ authors = ["Pascal Seitz <pascal.seitz@gmail.com>"]
 [dependencies]
 bitfield = "0.12.1"
 rand = "0.4"
+snap = "0.2"
+byteorder = "1.2.2"
+criterion = "0.2.2"
+
+[[bench]]
+name = "bench"
+harness = false

@@ -2,6 +2,8 @@
 extern crate test;
 extern crate rand;
 
+use std::mem::transmute;
+
 #[repr(C)]
 union VIntData {
     bytes: [u8; 4],
@@ -16,7 +18,7 @@ pub struct VIntArrayFixed{
 impl VIntArrayFixed {
     pub fn encode(&mut self, val:u32) {
         unsafe{
-
+            self.data.reserve(4);
             let mut el = VIntData{val};
             el.val <<= 2; // shift two to the left, to make space for the signal flags
 
@@ -52,7 +54,6 @@ impl VIntArrayFixed {
     }
 
 }
-
 
 #[derive(Debug, Clone)]
 pub struct VintArrayFixedIterator<'a>  {
@@ -107,11 +108,6 @@ impl<'a> Iterator for VintArrayFixedIterator<'a> {
         (self.len-self.pos / 2, Some(self.len-self.pos))
     }
 
-    #[inline]
-    fn count(self) -> usize {
-        self.list.data.len()
-    }
-
 }
 
 
@@ -143,38 +139,36 @@ pub struct VIntArray{
 
 impl VIntArray {
     pub fn encode(&mut self, val:u32) {
-        unsafe{
-            let mut pos = 0;
-            let mut el = VIntData{val};
-            let mut push_n_set = |last_block: bool|{
-                if pos > 0 {
-                    el.val <<= 1;
-                }
-                if last_block {
-                    self.data.push(el.bytes[pos]);
-                }else{
-                    self.data.push(set_high_bit_u8(el.bytes[pos]));
-                }
-                pos +=1;
-            };
-
-            // let bytes: [u8; 4] = unsafe { transmute(el as u32) };
-            if val < 1<< 7 { //128
-                // self.data.push(el.bytes[0]);
-                push_n_set(true);
-            }else if val < 1 << 14 {
-                push_n_set(false);
-                push_n_set(true);
-            }else if val < 1 << 21 {
-                push_n_set(false);
-                push_n_set(false);
-                push_n_set(true);
-            }else{
-                push_n_set(false);
-                push_n_set(false);
-                push_n_set(false);
-                push_n_set(true);
+        let mut pos = 0;
+        let mut el = val;
+        let mut push_n_set = |last_block: bool|{
+            if pos > 0 {
+                el <<= 1;
             }
+            if last_block {
+                let bytes: [u8; 4] = unsafe { transmute(el) };
+                self.data.push(bytes[pos]);
+            }else{
+                let bytes: [u8; 4] = unsafe { transmute(el) };
+                self.data.push(set_high_bit_u8(bytes[pos]));
+            }
+            pos +=1;
+        };
+
+        if val < 1 << 7 { //128
+            push_n_set(true);
+        }else if val < 1 << 14 {
+            push_n_set(false);
+            push_n_set(true);
+        }else if val < 1 << 21 {
+            push_n_set(false);
+            push_n_set(false);
+            push_n_set(true);
+        }else{
+            push_n_set(false);
+            push_n_set(false);
+            push_n_set(false);
+            push_n_set(true);
         }
 
     }
@@ -183,23 +177,24 @@ impl VIntArray {
     pub fn decode_u8(&self, pos:usize) -> (u8, bool) {
         unsafe{
             let el = *self.data.get_unchecked(pos);
-            // if is_high_bit_set(*self.data.get_unchecked(pos)){
-            if el >= 1 << 7{
+            if is_high_bit_set(el){
                 (unset_high_bit_u8(el), true)
             }else{
                 (el, false)
             }
         }
     }
+
     #[inline]
     fn get_apply_bits(&self, pos:usize, offset:usize, val: &mut u32) -> bool {
         let (val_u8, has_more) = self.decode_u8(pos);
-        let mut el = VIntData{bytes: [0, 0, 0, 0]};
-        unsafe{
-            el.bytes[offset] = val_u8;
-            el.val >>= offset;
-            *val |= el.val;
-        }
+
+        let mut bytes: [u8; 4] = [0, 0, 0, 0];
+        bytes[offset] = val_u8;
+        let mut add_val: u32 = unsafe { transmute(bytes) };
+        add_val >>= offset;
+        *val |= add_val;
+
         has_more
     }
 
@@ -239,8 +234,6 @@ pub struct VintArrayIterator<'a>  {
     list: & 'a VIntArray,
     pos:usize,
     len:usize
-    // ptr: *const u8,
-    // end: *const u8,
 }
 
 impl<'a> Iterator for VintArrayIterator<'a> {
@@ -276,129 +269,8 @@ impl<'a> Iterator for VintArrayIterator<'a> {
         (self.len-self.pos / 2, Some(self.len-self.pos))
     }
 
-    #[inline]
-    fn count(self) -> usize {
-        self.list.data.len()
-    }
 
 }
-
-
-
-#[bench]
-fn encode_6_values(b: &mut test::Bencher) {
-    let mut vint = VIntArray::default();
-    b.iter(||{
-        vint.data.clear();
-        vint.encode(110);
-        vint.encode(120);
-
-        vint.encode(200);
-        vint.encode(2000);
-        vint.encode(70000);
-        vint.encode(3_000_000);
-
-    })
-}
-
-#[bench]
-fn encode_300_values(b: &mut test::Bencher) {
-    let mut vint = VIntArray::default();
-    b.iter(||{
-        vint.data.clear();
-        for i in 1..300 {
-            vint.encode(i*i*i);
-        }
-    })
-}
-
-#[bench]
-fn encode_300_values_fixed_vint(b: &mut test::Bencher) {
-    let mut vint = VIntArrayFixed::default();
-    b.iter(||{
-        vint.data.clear();
-        for i in 1..300 {
-            vint.encode(i*i*i);
-        }
-    })
-}
-
-#[bench]
-fn decode_sum_6_values_iter(b: &mut test::Bencher) {
-    let mut vint = VIntArray::default();
-    vint.encode(110);
-    vint.encode(120);
-
-    vint.encode(200);
-    vint.encode(2000);
-    vint.encode(70000);
-    vint.encode(3_000_000);
-    b.iter(||{
-        vint.iter().sum::<u32>()
-    })
-
-}
-
-#[bench]
-fn decode_sum_20_000_values_iter(b: &mut test::Bencher) {
-    use rand::distributions::{IndependentSample, Range};
-    let mut rng = rand::thread_rng();
-    let between = Range::new(0, 16_000_000);
-
-    let mut vint = VIntArray::default();
-    for _ in 1..20_000 {
-        vint.encode(between.ind_sample(&mut rng));
-    }
-    println!("VIntArray Bytes {:?}", vint.data.len() * 8);
-    b.iter(||{
-        let mut data:Vec<u32> = vec![];
-        for el in vint.iter(){
-            data.push(el);
-        }
-        data
-    })
-}
-
-#[bench]
-fn decode_sum_20_000_values_fixed_iter(b: &mut test::Bencher) {
-    use rand::distributions::{IndependentSample, Range};
-    let mut rng = rand::thread_rng();
-    let between = Range::new(0, 16_000_000);
-
-    let mut vint = VIntArrayFixed::default();
-    for _ in 1..20_000 {
-        vint.encode(between.ind_sample(&mut rng));
-    }
-    println!("VIntArrayFixed Bytes {:?}", vint.data.len() * 8);
-    b.iter(||{
-        let mut data:Vec<u32> = vec![];
-        for el in vint.iter(){
-            data.push(el);
-        }
-        data
-    })
-}
-
-#[bench]
-fn decode_sum_20_000_baseline(b: &mut test::Bencher) {
-    use rand::distributions::{IndependentSample, Range};
-    let mut rng = rand::thread_rng();
-    let between = Range::new(0, 16_000_000);
-
-    let mut data:Vec<u32> = vec![];
-    for _ in 1..20_000 {
-        data.push(between.ind_sample(&mut rng));
-    }
-
-    b.iter(||{
-        let mut data_out:Vec<u32> = vec![];
-        for el in data.iter(){
-            data_out.push(*el);
-        }
-        data_out
-    })
-}
-
 
 #[bench]
 fn unset_high_bit_u8_bench(b: &mut test::Bencher) {
@@ -407,7 +279,6 @@ fn unset_high_bit_u8_bench(b: &mut test::Bencher) {
         unset_high_bit_u8(data[0]) + unset_high_bit_u8(data[1])+ unset_high_bit_u8(data[2])+ unset_high_bit_u8(data[3])+ unset_high_bit_u8(data[4])+ unset_high_bit_u8(data[5])
     })
 }
-
 
 #[bench]
 fn unset_high_bit_u8_shift(b: &mut test::Bencher) {
@@ -422,17 +293,11 @@ pub fn set_bit_at(input: &mut u8, n: u8) {
     *input |= 1 << n
 }
 
-const ONLY_HIGH_BIT_SET:u8 = (1 << 7);
-const ALL_BITS_BUT_HIGHEST_SET:u8 = (1 << 7) - 1;
+const ONLY_HIGH_BIT_U8:u8 = (1 << 7);
 
 #[inline]
 pub fn set_high_bit_u8(input: u8) -> u8{
-    input | ONLY_HIGH_BIT_SET
-}
-
-#[inline]
-pub fn unset_high_bit(input: &mut u8) {
-    *input &= ALL_BITS_BUT_HIGHEST_SET
+    input | ONLY_HIGH_BIT_U8
 }
 
 #[inline]
@@ -442,6 +307,6 @@ pub fn unset_high_bit_u8(input: u8) -> u8 {
 
 #[inline]
 pub fn is_high_bit_set(input: u8) -> bool {
-    input & ONLY_HIGH_BIT_SET != 0
+    input & ONLY_HIGH_BIT_U8 != 0
 }
 
