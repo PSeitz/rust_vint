@@ -1,6 +1,11 @@
 #![feature(test)]
+#![feature(plugin)]
+#![plugin(quickcheck_macros)]
 extern crate test;
 extern crate rand;
+
+#[cfg(test)]
+extern crate quickcheck;
 
 use std::mem::transmute;
 
@@ -111,27 +116,6 @@ impl<'a> Iterator for VintArrayFixedIterator<'a> {
 }
 
 
-#[test]
-fn test_encode_decode_vint_array() {
-    let mut vint = VIntArrayFixed::default();
-    vint.encode(50);
-    vint.encode(120);
-
-    vint.encode(200);
-    vint.encode(2000);
-    vint.encode(70000);
-    vint.encode(3_000_000);
-
-    let mut iter = vint.iter();
-    assert_eq!(iter.next().unwrap(), 50);
-    assert_eq!(iter.next().unwrap(), 120);
-    assert_eq!(iter.next().unwrap(), 200);
-    assert_eq!(iter.next().unwrap(), 2000);
-    assert_eq!(iter.next().unwrap(), 70000);
-    assert_eq!(iter.next().unwrap(), 3_000_000);
-}
-
-
 #[derive(Debug, Clone, Default)]
 pub struct VIntArray{
     pub data: Vec<u8>,
@@ -208,25 +192,6 @@ impl VIntArray {
 
 }
 
-#[test]
-fn test_encode_decode_vint() {
-    let mut vint = VIntArray::default();
-    vint.encode(110);
-    vint.encode(120);
-
-    vint.encode(200);
-    vint.encode(2000);
-    vint.encode(70000);
-    vint.encode(3_000_000);
-
-    let mut iter = vint.iter();
-    assert_eq!(iter.next().unwrap(), 110);
-    assert_eq!(iter.next().unwrap(), 120);
-    assert_eq!(iter.next().unwrap(), 200);
-    assert_eq!(iter.next().unwrap(), 2000);
-    assert_eq!(iter.next().unwrap(), 70000);
-    assert_eq!(iter.next().unwrap(), 3_000_000);
-}
 
 
 #[derive(Debug, Clone)]
@@ -309,4 +274,66 @@ pub fn unset_high_bit_u8(input: u8) -> u8 {
 pub fn is_high_bit_set(input: u8) -> bool {
     input & ONLY_HIGH_BIT_U8 != 0
 }
+
+
+
+#[cfg(test)]
+mod quick_tests {
+    use super::*;
+
+    #[quickcheck]
+    fn encode_and_decoded_is_same_fixed(xs: Vec<u32>) -> bool {
+        let xs:Vec<u32> = xs.iter().map(|el| el / 8).collect();
+        let mut vint = VIntArrayFixed::default();
+        for el in xs.iter() {
+            vint.encode(*el);
+        }
+        let decoded_data:Vec<u32> = vint.iter().collect();
+        xs == decoded_data
+    }
+
+    #[quickcheck]
+    fn encode_and_decoded_is_same(xs: Vec<u32>) -> bool {
+        let xs:Vec<u32> = xs.iter().map(|el| el / 8).collect();
+        let mut vint = VIntArray::default();
+        for el in xs.iter() {
+            vint.encode(*el);
+        }
+        let decoded_data:Vec<u32> = vint.iter().collect();
+        xs == decoded_data
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn get_test_array() -> Vec<u32> {
+        vec![64, 128, 110, 120, 200, 2000, 70000, 3_000_000, 10_000_000]
+    }
+
+    #[test]
+    fn test_encode_decode_vint() {
+        let mut vint = VIntArray::default();
+        for el in get_test_array().iter() {
+            vint.encode(*el);
+        }
+        let decoded_data:Vec<u32> = vint.iter().collect();
+        assert_eq!(get_test_array(), decoded_data);
+
+    }
+
+    #[test]
+    fn test_encode_decode_vint_fixed() {
+        let mut vint = VIntArrayFixed::default();
+        for el in get_test_array().iter() {
+            vint.encode(*el);
+        }
+        let decoded_data:Vec<u32> = vint.iter().collect();
+        assert_eq!(get_test_array(), decoded_data);
+    }
+
+}
+
+
 
