@@ -7,8 +7,9 @@ extern crate byteorder;
 
 use byteorder::{ByteOrder, LittleEndian};
 
-use vint::*;
-use vint_encode_most_common::*;
+use vint::vint_encode_most_common::*;
+use vint::vint::*;
+use vint::vint_fixed::*;
 
 use criterion::Criterion;
 use criterion::*;
@@ -57,7 +58,7 @@ fn criterion_benchmark(c: &mut Criterion) {
     let plot_config = PlotConfiguration::default()
     .summary_scale(AxisScale::Logarithmic);
 
-    let parameters = vec![1, 2, 25, 250, 2_500, 25_000, 250_000];
+    let parameters = vec![1, 2, 25, 250, 2_500, 25_000, 250_000, 2_500_000];
     let benchmark = ParameterizedBenchmark::new("snappy", |b, i| {
         let mut data:Vec<u32> = vec![];
         for i in 1..*i {

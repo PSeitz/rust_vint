@@ -69,7 +69,6 @@ mod tests {
         }
         let decoded_data:Vec<u32> = vint.iter().collect();
         assert_eq!(get_test_array(), decoded_data);
-
     }
 
     #[test]

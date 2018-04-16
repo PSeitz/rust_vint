@@ -77,7 +77,6 @@ impl VIntArray {
 
 }
 
-
 #[derive(Debug, Clone)]
 pub struct VintArrayIterator<'a>  {
     list: & 'a VIntArray,
