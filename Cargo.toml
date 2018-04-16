@@ -7,6 +7,7 @@ authors = ["Pascal Seitz <pascal.seitz@gmail.com>"]
 bitfield = "0.12.1"
 rand = "0.4"
 snap = "0.2"
+fnv = "1.0.3"
 byteorder = "1.2.2"
 criterion = "0.2.2"
 quickcheck = "0.6"

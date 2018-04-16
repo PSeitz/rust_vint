@@ -8,9 +8,9 @@ extern crate byteorder;
 use byteorder::{ByteOrder, LittleEndian};
 
 use vint::*;
+use vint_encode_most_common::*;
 
 use criterion::Criterion;
-use criterion::Fun;
 use criterion::*;
 
 #[inline]
@@ -42,91 +42,26 @@ fn snappy_encode(data: &[u32]) -> Vec<u8> {
     encoder.compress_vec(&vec_to_bytes_u32(data)).unwrap()
 }
 
+fn pseudo_rand(i:u32) -> u32 {
+    if i%2 == 0{
+        ((i as u64 * i as u64) % 16_000) as u32
+    }
+    else{
+        i % 3
+    }
+}
 
 
 fn criterion_benchmark(c: &mut Criterion) {
 
-    // let decode_copy_vint = Fun::new("vint", |b, i| {
-    //     let mut vint = VIntArray::default();
-    //     for i in 1..*i {
-    //         vint.encode(((i as u64 * i as u64) % 16_000) as u32);
-    //     }
-    //     b.iter(|| vint.iter().collect::<Vec<u32>>())
-    // });
+    let plot_config = PlotConfiguration::default()
+    .summary_scale(AxisScale::Logarithmic);
 
-    // let decode_copy_vint_fixed = Fun::new("vint_fixed", |b, i| {
-    //     let mut vint = VIntArrayFixed::default();
-    //     for i in 1..*i {
-    //         vint.encode(((i as u64 * i as u64) % 16_000) as u32);
-    //     }
-    //     b.iter(|| vint.iter().collect::<Vec<u32>>())
-    // });
-
-    // let decode_copy_baseline = Fun::new("baseline", |b, i| {
-    //     let mut data:Vec<u32> = vec![];
-    //     for i in 1..*i {
-    //         data.push(((i as u64 * i as u64) % 16_000) as u32);
-    //     }
-    //     b.iter(|| data.iter().cloned().collect::<Vec<u32>>())
-    // });
-
-    // let decode_copy_snappy = Fun::new("snappy", |b, i| {
-    //     let mut data:Vec<u32> = vec![];
-    //     for i in 1..*i {
-    //         data.push(((i as u64 * i as u64) % 16_000) as u32);
-    //     }
-    //     let dat = snappy_encode(&data);
-    //     b.iter(|| {
-    //         let mut decoder = snap::Decoder::new();
-    //         bytes_to_vec_u32(&decoder.decompress_vec(&dat).unwrap())
-    //     });
-    // });
-
-    // let functions = vec!(decode_copy_vint, decode_copy_vint_fixed, decode_copy_baseline, decode_copy_snappy);
-    
-    // c.bench_functions("Encode Decode", functions, 500_000);
-
-    // c.bench_function_over_inputs("decode_copy_vint", |b, &&size| {
-    //     let mut vint = VIntArray::default();
-    //     for i in 1..size {
-    //         vint.encode(((i as u64 * i as u64) % 16_000) as u32);
-    //     }
-    //     b.iter(|| vint.iter().collect::<Vec<u32>>());
-    // }, &[300, 100_000]);
-
-    // c.bench_function_over_inputs("decode_copy_vint_fixed", |b, &&size| {
-    //     let mut vint = VIntArrayFixed::default();
-    //     for i in 1..size {
-    //         vint.encode(((i as u64 * i as u64) % 16_000) as u32);
-    //     }
-    //     b.iter(|| vint.iter().collect::<Vec<u32>>());
-    // }, &[300, 100_000]);
-
-    // c.bench_function_over_inputs("decode_copy_baseline", |b, &&size| {
-    //     let mut data:Vec<u32> = vec![];
-    //     for i in 1..size {
-    //         data.push(((i as u64 * i as u64) % 16_000) as u32);
-    //     }
-    //     b.iter(|| data.iter().cloned().collect::<Vec<u32>>());
-    // }, &[300, 100_000]);
-
-    // c.bench_function_over_inputs("decode_copy_snappy", |b, &&size| {
-    //     let mut data:Vec<u32> = vec![];
-    //     for i in 1..size {
-    //         data.push(((i as u64 * i as u64) % 16_000) as u32);
-    //     }
-    //     let dat = snappy_encode(&data);
-    //     b.iter(|| {
-    //         let mut decoder = snap::Decoder::new();
-    //         bytes_to_vec_u32(&decoder.decompress_vec(&dat).unwrap())
-    //     });
-    // }, &[100, 100_000, 1_000_000]);
-
-    let parameters = vec![100, 1_000, 10_000, 50_000, 100_000, 200_000, 300_000, 400_000, 500_000];
+    let parameters = vec![1, 2, 25, 250, 2_500, 25_000, 250_000];
     let benchmark = ParameterizedBenchmark::new("snappy", |b, i| {
         let mut data:Vec<u32> = vec![];
         for i in 1..*i {
-            data.push(((i as u64 * i as u64) % 16_000) as u32);
+            data.push(pseudo_rand(i));
         }
         let dat = snappy_encode(&data);
         b.iter(|| {
@@ -137,100 +72,87 @@ fn criterion_benchmark(c: &mut Criterion) {
     .with_function("baseline", |b, i| {
         let mut data:Vec<u32> = vec![];
         for i in 1..*i {
-            data.push(((i as u64 * i as u64) % 16_000) as u32);
+            data.push(pseudo_rand(i));
         }
         b.iter(|| data.iter().cloned().collect::<Vec<u32>>())
     })
     .with_function("vint", |b, i| {
         let mut vint = VIntArray::default();
         for i in 1..*i {
-            vint.encode(((i as u64 * i as u64) % 16_000) as u32);
+            vint.encode(pseudo_rand(i));
         }
         b.iter(|| vint.iter().collect::<Vec<u32>>())
     })
     .with_function("vint_fixed", |b, i| {
         let mut vint = VIntArrayFixed::default();
         for i in 1..*i {
-            vint.encode(((i as u64 * i as u64) % 16_000) as u32);
+            vint.encode(pseudo_rand(i));
         }
         b.iter(|| vint.iter().collect::<Vec<u32>>())
-    });
+    })
+    .with_function("vint most common", |b, i| {
+        let mut vint = VIntArrayEncodeMostCommon::default();
+        let values:Vec<u32> = (1..*i).map(|i| pseudo_rand(i)).collect();
+        vint.encode_vals(&values);
+        b.iter(|| vint.iter().collect::<Vec<u32>>())
+    })
+    .plot_config(plot_config)
+    .throughput(|s| Throughput::Bytes(s * 4 as u32));
+    c.bench("decode throughput, max_val 16_000", benchmark);
 
-    c.bench("decode encode", benchmark);
 
-
-    let parameters = vec![1, 10, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1_000];
+    let plot_config = PlotConfiguration::default()
+    .summary_scale(AxisScale::Logarithmic);
+    let parameters = vec![1, 2, 25, 250, 2_500, 25_000, 250_000];
     let benchmark = ParameterizedBenchmark::new("snappy", |b, i| {
-        let mut data:Vec<u32> = vec![];
-        for i in 1..*i {
-            data.push(((i as u64 * i as u64) % 16_000) as u32);
-        }
-        let dat = snappy_encode(&data);
         b.iter(|| {
-            let mut decoder = snap::Decoder::new();
-            bytes_to_vec_u32(&decoder.decompress_vec(&dat).unwrap())
+            let mut data:Vec<u32> = vec![];
+            for i in 1..*i {
+                data.push(pseudo_rand(i));
+            }
+            snappy_encode(&data)
         });
     }, parameters)
     .with_function("baseline", |b, i| {
-        let mut data:Vec<u32> = vec![];
-        for i in 1..*i {
-            data.push(((i as u64 * i as u64) % 16_000) as u32);
-        }
-        b.iter(|| data.iter().cloned().collect::<Vec<u32>>())
-    })
-    .with_function("vint", |b, i| {
-        let mut vint = VIntArray::default();
-        for i in 1..*i {
-            vint.encode(((i as u64 * i as u64) % 16_000) as u32);
-        }
-        b.iter(|| vint.iter().collect::<Vec<u32>>())
-    })
-    .with_function("vint_fixed", |b, i| {
-        let mut vint = VIntArrayFixed::default();
-        for i in 1..*i {
-            vint.encode(((i as u64 * i as u64) % 16_000) as u32);
-        }
-        b.iter(|| vint.iter().collect::<Vec<u32>>())
-    });
-
-    c.bench("decode encode small", benchmark);
-
-
-    let parameters = vec![1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
-    let benchmark = ParameterizedBenchmark::new("snappy", |b, i| {
-        let mut data:Vec<u32> = vec![];
-        for i in 1..*i {
-            data.push(((i as u64 * i as u64) % 16_000) as u32);
-        }
-        let dat = snappy_encode(&data);
         b.iter(|| {
-            let mut decoder = snap::Decoder::new();
-            bytes_to_vec_u32(&decoder.decompress_vec(&dat).unwrap())
-        });
-    }, parameters)
-    .with_function("baseline", |b, i| {
-        let mut data:Vec<u32> = vec![];
-        for i in 1..*i {
-            data.push(((i as u64 * i as u64) % 16_000) as u32);
-        }
-        b.iter(|| data.iter().cloned().collect::<Vec<u32>>())
+            let mut data:Vec<u32> = vec![];
+            for i in 1..*i {
+                data.push(pseudo_rand(i));
+            }
+            data
+        })
     })
     .with_function("vint", |b, i| {
-        let mut vint = VIntArray::default();
-        for i in 1..*i {
-            vint.encode(((i as u64 * i as u64) % 16_000) as u32);
-        }
-        b.iter(|| vint.iter().collect::<Vec<u32>>())
+        b.iter(|| {
+            let mut vint = VIntArray::default();
+            for i in 1..*i {
+                vint.encode(pseudo_rand(i));
+            }
+            vint
+        })
     })
     .with_function("vint_fixed", |b, i| {
-        let mut vint = VIntArrayFixed::default();
-        for i in 1..*i {
-            vint.encode(((i as u64 * i as u64) % 16_000) as u32);
-        }
-        b.iter(|| vint.iter().collect::<Vec<u32>>())
-    });
+        b.iter(|| {
+            let mut vint = VIntArrayFixed::default();
+            for i in 1..*i {
+                vint.encode(pseudo_rand(i));
+            }
+            vint
+        })
+    })
+    .with_function("vint most common", |b, i| {
+        b.iter(|| {
+            let mut vint = VIntArrayEncodeMostCommon::default();
+            let values:Vec<u32> = (1..*i).map(|i| pseudo_rand(i)).collect();
+            vint.encode_vals(&values);
+            vint
+        })
+    })
+    .plot_config(plot_config)
+    .throughput(|s| Throughput::Bytes(s * 4 as u32));
 
-    c.bench("decode encode very small", benchmark);
+    c.bench("encode throughput, max_val 16_000", benchmark);
+
 }
 
 criterion_group!(benches, criterion_benchmark);
