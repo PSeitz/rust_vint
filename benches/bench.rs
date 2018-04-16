@@ -10,7 +10,8 @@ use byteorder::{ByteOrder, LittleEndian};
 use vint::*;
 
 use criterion::Criterion;
-
+use criterion::Fun;
+use criterion::*;
 
 #[inline]
 pub fn vec_with_size_uninitialized<T>(size: usize) -> Vec<T> {
@@ -45,119 +46,191 @@ fn snappy_encode(data: &[u32]) -> Vec<u8> {
 
 fn criterion_benchmark(c: &mut Criterion) {
 
-    let mut vint = VIntArray::default();
-    c.bench_function("encode_6_values", move |b| b.iter(||{
-        vint.data.clear();
-        vint.encode(110);
-        vint.encode(120);
+    // let decode_copy_vint = Fun::new("vint", |b, i| {
+    //     let mut vint = VIntArray::default();
+    //     for i in 1..*i {
+    //         vint.encode(((i as u64 * i as u64) % 16_000) as u32);
+    //     }
+    //     b.iter(|| vint.iter().collect::<Vec<u32>>())
+    // });
 
-        vint.encode(200);
-        vint.encode(2000);
-        vint.encode(70000);
-        vint.encode(3_000_000);
-    }));
+    // let decode_copy_vint_fixed = Fun::new("vint_fixed", |b, i| {
+    //     let mut vint = VIntArrayFixed::default();
+    //     for i in 1..*i {
+    //         vint.encode(((i as u64 * i as u64) % 16_000) as u32);
+    //     }
+    //     b.iter(|| vint.iter().collect::<Vec<u32>>())
+    // });
 
-    c.bench_function("encode_300_values", |b| b.iter(||{
+    // let decode_copy_baseline = Fun::new("baseline", |b, i| {
+    //     let mut data:Vec<u32> = vec![];
+    //     for i in 1..*i {
+    //         data.push(((i as u64 * i as u64) % 16_000) as u32);
+    //     }
+    //     b.iter(|| data.iter().cloned().collect::<Vec<u32>>())
+    // });
+
+    // let decode_copy_snappy = Fun::new("snappy", |b, i| {
+    //     let mut data:Vec<u32> = vec![];
+    //     for i in 1..*i {
+    //         data.push(((i as u64 * i as u64) % 16_000) as u32);
+    //     }
+    //     let dat = snappy_encode(&data);
+    //     b.iter(|| {
+    //         let mut decoder = snap::Decoder::new();
+    //         bytes_to_vec_u32(&decoder.decompress_vec(&dat).unwrap())
+    //     });
+    // });
+
+    // let functions = vec!(decode_copy_vint, decode_copy_vint_fixed, decode_copy_baseline, decode_copy_snappy);
+    
+    // c.bench_functions("Encode Decode", functions, 500_000);
+
+    // c.bench_function_over_inputs("decode_copy_vint", |b, &&size| {
+    //     let mut vint = VIntArray::default();
+    //     for i in 1..size {
+    //         vint.encode(((i as u64 * i as u64) % 16_000) as u32);
+    //     }
+    //     b.iter(|| vint.iter().collect::<Vec<u32>>());
+    // }, &[300, 100_000]);
+
+    // c.bench_function_over_inputs("decode_copy_vint_fixed", |b, &&size| {
+    //     let mut vint = VIntArrayFixed::default();
+    //     for i in 1..size {
+    //         vint.encode(((i as u64 * i as u64) % 16_000) as u32);
+    //     }
+    //     b.iter(|| vint.iter().collect::<Vec<u32>>());
+    // }, &[300, 100_000]);
+
+    // c.bench_function_over_inputs("decode_copy_baseline", |b, &&size| {
+    //     let mut data:Vec<u32> = vec![];
+    //     for i in 1..size {
+    //         data.push(((i as u64 * i as u64) % 16_000) as u32);
+    //     }
+    //     b.iter(|| data.iter().cloned().collect::<Vec<u32>>());
+    // }, &[300, 100_000]);
+
+    // c.bench_function_over_inputs("decode_copy_snappy", |b, &&size| {
+    //     let mut data:Vec<u32> = vec![];
+    //     for i in 1..size {
+    //         data.push(((i as u64 * i as u64) % 16_000) as u32);
+    //     }
+    //     let dat = snappy_encode(&data);
+    //     b.iter(|| {
+    //         let mut decoder = snap::Decoder::new();
+    //         bytes_to_vec_u32(&decoder.decompress_vec(&dat).unwrap())
+    //     });
+    // }, &[100, 100_000, 1_000_000]);
+
+    let parameters = vec![100, 1_000, 10_000, 50_000, 100_000, 200_000, 300_000, 400_000, 500_000];
+    let benchmark = ParameterizedBenchmark::new("snappy", |b, i| {
+        let mut data:Vec<u32> = vec![];
+        for i in 1..*i {
+            data.push(((i as u64 * i as u64) % 16_000) as u32);
+        }
+        let dat = snappy_encode(&data);
+        b.iter(|| {
+            let mut decoder = snap::Decoder::new();
+            bytes_to_vec_u32(&decoder.decompress_vec(&dat).unwrap())
+        });
+    }, parameters)
+    .with_function("baseline", |b, i| {
+        let mut data:Vec<u32> = vec![];
+        for i in 1..*i {
+            data.push(((i as u64 * i as u64) % 16_000) as u32);
+        }
+        b.iter(|| data.iter().cloned().collect::<Vec<u32>>())
+    })
+    .with_function("vint", |b, i| {
         let mut vint = VIntArray::default();
-        vint.data.clear();
-        for i in 1..300 {
-            vint.encode(i*i*i);
+        for i in 1..*i {
+            vint.encode(((i as u64 * i as u64) % 16_000) as u32);
         }
-    }));
-
-    c.bench_function("encode_300_values_fixed_vint", |b| b.iter(||{
+        b.iter(|| vint.iter().collect::<Vec<u32>>())
+    })
+    .with_function("vint_fixed", |b, i| {
         let mut vint = VIntArrayFixed::default();
-        vint.data.clear();
-        for i in 1..300 {
-            vint.encode(i*i*i);
+        for i in 1..*i {
+            vint.encode(((i as u64 * i as u64) % 16_000) as u32);
         }
-    }));
+        b.iter(|| vint.iter().collect::<Vec<u32>>())
+    });
 
-    c.bench_function("encode_300_baseline", move |b| b.iter(||{
-        let mut data = vec![];
-        for i in 1..300 {
-            data.push(i*i*i);
+    c.bench("decode encode", benchmark);
+
+
+    let parameters = vec![1, 10, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1_000];
+    let benchmark = ParameterizedBenchmark::new("snappy", |b, i| {
+        let mut data:Vec<u32> = vec![];
+        for i in 1..*i {
+            data.push(((i as u64 * i as u64) % 16_000) as u32);
         }
-    }));
-
-    c.bench_function("encode_300_values_snappy", |b| b.iter(||{
-        let mut dat:Vec<u32> = vec![];
-        for i in 1..300 {
-            dat.push(i*i*i);
+        let dat = snappy_encode(&data);
+        b.iter(|| {
+            let mut decoder = snap::Decoder::new();
+            bytes_to_vec_u32(&decoder.decompress_vec(&dat).unwrap())
+        });
+    }, parameters)
+    .with_function("baseline", |b, i| {
+        let mut data:Vec<u32> = vec![];
+        for i in 1..*i {
+            data.push(((i as u64 * i as u64) % 16_000) as u32);
         }
-        snappy_encode(&dat)
-    }));
-
-    let mut vint = VIntArrayFixed::default();
-    for i in 1..300 {
-        vint.encode(i*i*i);
-    }
-    c.bench_function("decode_sum_300_values_iter", move |b| b.iter(||{
-        vint.iter().sum::<u32>()
-    }));
-
-
-    let mut vint = VIntArray::default();
-    for i in 1..1_000_000 {
-        vint.encode(((i as u64 * i as u64) % 16_000) as u32);
-    }
-    println!("VIntArray Bytes {:?}", vint.data.len());
-    c.bench_function("decode_copy_1_000_000_values_iter", move |b| b.iter(||{
-        let mut data_out:Vec<u32> = vec![];
-        for el in vint.iter(){
-            data_out.push(el);
+        b.iter(|| data.iter().cloned().collect::<Vec<u32>>())
+    })
+    .with_function("vint", |b, i| {
+        let mut vint = VIntArray::default();
+        for i in 1..*i {
+            vint.encode(((i as u64 * i as u64) % 16_000) as u32);
         }
-        data_out
-    }));
-
-    let mut vint = VIntArrayFixed::default();
-        for i in 1..1_000_000 {
-        vint.encode(((i as u64 * i as u64) % 16_000) as u32);
-    }
-    println!("VIntArrayFixed Bytes {:?}", vint.data.len());
-    c.bench_function("decode_copy_1_000_000_values_fixed_iter", move |b| b.iter(||{
-        let mut data_out:Vec<u32> = vec![];
-        for el in vint.iter(){
-            data_out.push(el);
+        b.iter(|| vint.iter().collect::<Vec<u32>>())
+    })
+    .with_function("vint_fixed", |b, i| {
+        let mut vint = VIntArrayFixed::default();
+        for i in 1..*i {
+            vint.encode(((i as u64 * i as u64) % 16_000) as u32);
         }
-        data_out
-    }));
+        b.iter(|| vint.iter().collect::<Vec<u32>>())
+    });
+
+    c.bench("decode encode small", benchmark);
 
 
-    let mut data:Vec<u32> = vec![];
-    for i in 1..1_000_000 {
-        data.push(((i as u64 * i as u64) % 16_000) as u32);
-    }
-    c.bench_function("decode_copy_1_000_000_baseline", move |b| b.iter(||{
-        let mut data_out:Vec<u32> = vec![];
-        for el in data.iter(){
-            data_out.push(*el);
+    let parameters = vec![1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+    let benchmark = ParameterizedBenchmark::new("snappy", |b, i| {
+        let mut data:Vec<u32> = vec![];
+        for i in 1..*i {
+            data.push(((i as u64 * i as u64) % 16_000) as u32);
         }
-        data_out
-    }));
+        let dat = snappy_encode(&data);
+        b.iter(|| {
+            let mut decoder = snap::Decoder::new();
+            bytes_to_vec_u32(&decoder.decompress_vec(&dat).unwrap())
+        });
+    }, parameters)
+    .with_function("baseline", |b, i| {
+        let mut data:Vec<u32> = vec![];
+        for i in 1..*i {
+            data.push(((i as u64 * i as u64) % 16_000) as u32);
+        }
+        b.iter(|| data.iter().cloned().collect::<Vec<u32>>())
+    })
+    .with_function("vint", |b, i| {
+        let mut vint = VIntArray::default();
+        for i in 1..*i {
+            vint.encode(((i as u64 * i as u64) % 16_000) as u32);
+        }
+        b.iter(|| vint.iter().collect::<Vec<u32>>())
+    })
+    .with_function("vint_fixed", |b, i| {
+        let mut vint = VIntArrayFixed::default();
+        for i in 1..*i {
+            vint.encode(((i as u64 * i as u64) % 16_000) as u32);
+        }
+        b.iter(|| vint.iter().collect::<Vec<u32>>())
+    });
 
-
-    let mut data:Vec<u32> = vec![];
-    for i in 1..1_000_000 {
-        data.push(((i as u64 * i as u64) % 16_000) as u32);
-    }
-    c.bench_function("decode_copy_1_000_000_super_baseline", move |b| b.iter(||{
-        data.to_vec()
-    }));
-
-
-    let mut data:Vec<u32> = vec![];
-    for i in 1..1_000_000 {
-        data.push(((i as u64 * i as u64) % 16_000) as u32);
-    }
-    let dat = snappy_encode(&data);
-
-    println!("Size in Bytes {:?}", dat.len());
-    c.bench_function("decode_copy_1_000_000_snappy", move |b| b.iter(||{
-        let mut decoder = snap::Decoder::new();
-        bytes_to_vec_u32(&decoder.decompress_vec(&dat).unwrap())
-    }));
-
+    c.bench("decode encode very small", benchmark);
 }
 
 criterion_group!(benches, criterion_benchmark);
