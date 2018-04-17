@@ -168,6 +168,31 @@ impl VIntArrayEncodeMostCommon {
 
     }
 
+    pub fn iter(& self) -> VintArrayMostCommonIterator {
+        VintArrayMostCommonIterator::new(&self.data, self.most_common_val.unwrap_or(0) )
+    }
+
+}
+
+#[derive(Debug, Clone)]
+pub struct VintArrayMostCommonIterator<'a>  {
+    data: & 'a [u8],
+    pos:usize,
+    next_val: Option<u32>,
+    most_common_val: u32
+}
+
+impl<'a> VintArrayMostCommonIterator<'a> {
+
+    fn new(data: &'a[u8], most_common_val: u32) -> Self {
+        VintArrayMostCommonIterator {
+            data: data,
+            pos: 0,
+            next_val: None,
+            most_common_val: most_common_val
+        }
+    }
+
     #[inline]
     pub fn decode_u8(&self, pos:usize) -> (u8, bool) {
         unsafe{
@@ -193,25 +218,6 @@ impl VIntArrayEncodeMostCommon {
         has_more
     }
 
-    pub fn iter(& self) -> VintArrayMostCommonIterator {
-        VintArrayMostCommonIterator {
-            list: &self,
-            pos: 0,
-            len: self.data.len(),
-            next_val: None,
-            most_common_val: self.most_common_val.unwrap_or(0)
-        }
-    }
-
-}
-
-#[derive(Debug, Clone)]
-pub struct VintArrayMostCommonIterator<'a>  {
-    list: & 'a VIntArrayEncodeMostCommon,
-    pos:usize,
-    len:usize,
-    next_val: Option<u32>,
-    most_common_val: u32
 }
 
 impl<'a> Iterator for VintArrayMostCommonIterator<'a> {
@@ -224,10 +230,10 @@ impl<'a> Iterator for VintArrayMostCommonIterator<'a> {
             return Some(next_val);
         }
 
-        if self.pos == self.len {
+        if self.pos == self.data.len() {
             None
         }else {
-            let (mut val_u8, has_more) = self.list.decode_u8(self.pos);
+            let (mut val_u8, has_more) = self.decode_u8(self.pos);
             if is_second_high_bit_set(val_u8){
                 val_u8 = unset_second_high_bit_u8(val_u8);
                 self.next_val = Some(self.most_common_val);
@@ -235,16 +241,16 @@ impl<'a> Iterator for VintArrayMostCommonIterator<'a> {
             self.pos += 1;
             let mut val = val_u8 as u32;
             if has_more{
-                let has_more = self.list.get_apply_bits(self.pos, 1, &mut val);
+                let has_more = self.get_apply_bits(self.pos, 1, &mut val);
                 self.pos += 1;
                 if has_more{
-                    let has_more = self.list.get_apply_bits(self.pos, 2, &mut val);
+                    let has_more = self.get_apply_bits(self.pos, 2, &mut val);
                     self.pos += 1;
                     if has_more{
-                        let has_more = self.list.get_apply_bits(self.pos, 3, &mut val);
+                        let has_more = self.get_apply_bits(self.pos, 3, &mut val);
                         self.pos += 1;
                         if has_more{
-                            let el = unsafe{*self.list.data.get_unchecked(self.pos) };
+                            let el = unsafe{*self.data.get_unchecked(self.pos) };
                             let bytes: [u8; 8] = [0, 0, 0, 0, el, 0, 0, 0];
                             let mut add_val: u64 = unsafe { transmute(bytes) };
                             add_val >>= 5;
@@ -261,7 +267,7 @@ impl<'a> Iterator for VintArrayMostCommonIterator<'a> {
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.len-self.pos / 2, Some(self.len-self.pos))
+        (self.data.len()-self.pos / 2, Some(self.data.len()-self.pos))
     }
 
 }

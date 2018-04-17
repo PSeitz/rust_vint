@@ -83,6 +83,22 @@ impl VIntArray {
 
     }
 
+    pub fn iter(& self) -> VintArrayIterator {
+        VintArrayIterator {
+            data: &self.data,
+            pos: 0,
+        }
+    }
+
+}
+
+#[derive(Debug, Clone)]
+pub struct VintArrayIterator<'a>  {
+    data: & 'a [u8],
+    pos:usize
+}
+
+impl<'a> VintArrayIterator<'a> {
     #[inline]
     pub fn decode_u8(&self, pos:usize) -> (u8, bool) {
         unsafe{
@@ -107,46 +123,29 @@ impl VIntArray {
 
         has_more
     }
-
-    pub fn iter(& self) -> VintArrayIterator {
-        VintArrayIterator {
-            list: &self,
-            pos: 0,
-            len: self.data.len(),
-        }
-    }
-
 }
-
-#[derive(Debug, Clone)]
-pub struct VintArrayIterator<'a>  {
-    list: & 'a VIntArray,
-    pos:usize,
-    len:usize
-}
-
 impl<'a> Iterator for VintArrayIterator<'a> {
     type Item = u32;
 
     #[inline]
     fn next(&mut self) -> Option<u32> {
-        if self.pos == self.len {
+        if self.pos == self.data.len() {
             None
         }else {
-            let (val_u8, has_more) = self.list.decode_u8(self.pos);
+            let (val_u8, has_more) = self.decode_u8(self.pos);
             self.pos += 1;
             let mut val = val_u8 as u32;
             if has_more{
-                let has_more = self.list.get_apply_bits(self.pos, 1, &mut val);
+                let has_more = self.get_apply_bits(self.pos, 1, &mut val);
                 self.pos += 1;
                 if has_more{
-                    let has_more = self.list.get_apply_bits(self.pos, 2, &mut val);
+                    let has_more = self.get_apply_bits(self.pos, 2, &mut val);
                     self.pos += 1;
                     if has_more{
-                        let has_more = self.list.get_apply_bits(self.pos, 3, &mut val);
+                        let has_more = self.get_apply_bits(self.pos, 3, &mut val);
                         self.pos += 1;
                         if has_more{
-                            let el = unsafe{*self.list.data.get_unchecked(self.pos) };
+                            let el = unsafe{*self.data.get_unchecked(self.pos) };
                             let bytes: [u8; 4] = [0, 0, 0, el];
                             let mut add_val: u32 = unsafe { transmute(bytes) };
                             add_val <<= 4;
@@ -163,7 +162,7 @@ impl<'a> Iterator for VintArrayIterator<'a> {
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.len-self.pos / 2, Some(self.len-self.pos))
+        (self.data.len()-self.pos / 2, Some(self.data.len()-self.pos))
     }
 
 

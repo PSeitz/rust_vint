@@ -3,11 +3,11 @@ Crate `vint` is a library for compressing u32 integer arrays, composed mainly by
 by using only the necessary number of bytes required to encode the number.
 This is done in `VIntArray` for example by using one bit in every byte, to signal if more bytes are needed to encode a number.
 
-So for number 0-127 only one byte is required.   e.g. 8  -> 0b00001000  1byte required
-Above we would set the signal with the high bit. e.g 136 -> 0b10001000 0b00000001 2bytes required
+So for number 0-127 only one byte is required.   e.g. 8  -> `0b00001000`
+
+Above we would set the high bit as signal bit to read the next byte. e.g 136 -> `0b10001000` `0b00000001`
 
 */
-
 
 #![feature(test)]
 #![feature(plugin)]
