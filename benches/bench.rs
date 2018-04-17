@@ -9,7 +9,7 @@ use byteorder::{ByteOrder, LittleEndian};
 
 use vint::vint_encode_most_common::*;
 use vint::vint::*;
-use vint::vint_fixed::*;
+// use vint::vint_fixed::*;
 
 use criterion::Criterion;
 use criterion::*;
@@ -84,13 +84,13 @@ fn criterion_benchmark(c: &mut Criterion) {
         }
         b.iter(|| vint.iter().collect::<Vec<u32>>())
     })
-    .with_function("vint_fixed", |b, i| {
-        let mut vint = VIntArrayFixed::default();
-        for i in 1..*i {
-            vint.encode(pseudo_rand(i));
-        }
-        b.iter(|| vint.iter().collect::<Vec<u32>>())
-    })
+    // .with_function("vint_fixed", |b, i| {
+    //     let mut vint = VIntArrayFixed::default();
+    //     for i in 1..*i {
+    //         vint.encode(pseudo_rand(i));
+    //     }
+    //     b.iter(|| vint.iter().collect::<Vec<u32>>())
+    // })
     .with_function("vint most common", |b, i| {
         let mut vint = VIntArrayEncodeMostCommon::default();
         let values:Vec<u32> = (1..*i).map(|i| pseudo_rand(i)).collect();
@@ -132,15 +132,15 @@ fn criterion_benchmark(c: &mut Criterion) {
             vint
         })
     })
-    .with_function("vint_fixed", |b, i| {
-        b.iter(|| {
-            let mut vint = VIntArrayFixed::default();
-            for i in 1..*i {
-                vint.encode(pseudo_rand(i));
-            }
-            vint
-        })
-    })
+    // .with_function("vint_fixed", |b, i| {
+    //     b.iter(|| {
+    //         let mut vint = VIntArrayFixed::default();
+    //         for i in 1..*i {
+    //             vint.encode(pseudo_rand(i));
+    //         }
+    //         vint
+    //     })
+    // })
     .with_function("vint most common", |b, i| {
         b.iter(|| {
             let mut vint = VIntArrayEncodeMostCommon::default();

@@ -14,6 +14,7 @@ enum BytesRequired {
     Two,
     Three,
     Four,
+    Five,
 }
 
 fn get_bytes_required(val:u32) -> BytesRequired {
@@ -23,8 +24,10 @@ fn get_bytes_required(val:u32) -> BytesRequired {
         BytesRequired::Two
     }else if val < 1 << 20 {
         BytesRequired::Three
-    }else{
+    }else if val < 1 << 27 {
         BytesRequired::Four
+    }else{
+        BytesRequired::Five
     }
 }
 
@@ -65,7 +68,54 @@ impl VIntArrayEncodeMostCommon {
 
     }
 
+    fn encode_large(&mut self, val:u32, next_is_most_common_val: bool) {
+        let mut pos = 0;
+        let mut el = val;
+        let mut push_n_set = |last_block: bool|{
+            if pos == 4 {
+                let mut el_u64: u64 = val as u64;
+                el_u64 <<= 5;
+                let bytes: [u8; 8] = unsafe { transmute(el_u64) };
+                self.data.push(bytes[pos]);
+                return;
+            }
+            let is_first_block = pos == 0;
+            if pos > 0 {
+                el <<= 1;
+            }
+            let mut byte = unsafe { transmute::<u32, [u8; 4]>(el)[pos] };
+            if is_first_block {
+                if next_is_most_common_val {
+                    byte = set_second_high_bit_u8(byte);
+                }else{
+                    byte = unset_second_high_bit_u8(byte);
+                }
+            }
+            if last_block {
+                self.data.push(byte);
+            }else{
+                self.data.push(set_high_bit_u8(byte));
+            }
+            if pos == 0{
+                el <<= 1;
+            }
+            pos +=1;
+        };
+
+        push_n_set(false);
+        push_n_set(false);
+        push_n_set(false);
+        push_n_set(false);
+        push_n_set(true);
+    }
+
     fn encode(&mut self, val:u32, next_is_most_common_val: bool) {
+        let bytes_req = get_bytes_required(val);
+        if  val >= 1 << 27{
+            self.encode_large(val, next_is_most_common_val);
+            return;
+        }
+
         let mut pos = 0;
         let mut el = val;
         let mut push_n_set = |last_block: bool|{
@@ -92,7 +142,7 @@ impl VIntArrayEncodeMostCommon {
             pos +=1;
         };
 
-        match get_bytes_required(val) {
+        match bytes_req {
             BytesRequired::One => {
                 push_n_set(true);
             },
@@ -111,6 +161,9 @@ impl VIntArrayEncodeMostCommon {
                 push_n_set(false);
                 push_n_set(true);
             },
+            _ => {
+                panic!("should not happen");
+            }
         }
 
     }
@@ -188,8 +241,16 @@ impl<'a> Iterator for VintArrayMostCommonIterator<'a> {
                     let has_more = self.list.get_apply_bits(self.pos, 2, &mut val);
                     self.pos += 1;
                     if has_more{
-                        self.list.get_apply_bits(self.pos, 3, &mut val);
+                        let has_more = self.list.get_apply_bits(self.pos, 3, &mut val);
                         self.pos += 1;
+                        if has_more{
+                            let el = unsafe{*self.list.data.get_unchecked(self.pos) };
+                            let bytes: [u8; 8] = [0, 0, 0, 0, el, 0, 0, 0];
+                            let mut add_val: u64 = unsafe { transmute(bytes) };
+                            add_val >>= 5;
+                            val |= add_val as u32;
+                            self.pos += 1;
+                        }
                     }
                 }
             }
@@ -223,3 +284,12 @@ fn test_encode_decode_vint_most_common_single() {
     assert_eq!(&dat, &decoded_data);
 }
 
+
+#[test]
+fn test_encode_decode_vint_very_large_number() {
+    let mut vint = VIntArrayEncodeMostCommon::default();
+    let dat = vec![4_000_000_000];
+    vint.encode_vals(&dat);
+    let decoded_data:Vec<u32> = vint.iter().collect();
+    assert_eq!(&dat, &decoded_data);
+}

@@ -7,7 +7,48 @@ pub struct VIntArray{
 }
 
 impl VIntArray {
+    pub fn encode_vals(&mut self, vals: &[u32]) {
+        for val in vals{
+            self.encode(*val);
+        }
+    }
+
+    pub fn encode_large(&mut self, val:u32) {
+        let mut pos = 0;
+        let mut el = val;
+        let mut push_n_set = |last_block: bool|{
+            if pos == 4 {
+                let mut el_u64: u64 = val as u64;
+                el_u64 <<= 4;
+                let bytes: [u8; 8] = unsafe { transmute(el_u64) };
+                self.data.push(bytes[pos]);
+                return;
+            }
+            if pos > 0 {
+                el <<= 1;
+            }
+            if last_block {
+                let bytes: [u8; 4] = unsafe { transmute(el) };
+                self.data.push(bytes[pos]);
+            }else{
+                let bytes: [u8; 4] = unsafe { transmute(el) };
+                self.data.push(set_high_bit_u8(bytes[pos]));
+            }
+            pos +=1;
+        };
+
+        push_n_set(false);
+        push_n_set(false);
+        push_n_set(false);
+        push_n_set(false);
+        push_n_set(true);
+    }
+
     pub fn encode(&mut self, val:u32) {
+        if  val >= 1 << 28{
+            self.encode_large(val);
+            return;
+        }
         let mut pos = 0;
         let mut el = val;
         let mut push_n_set = |last_block: bool|{
@@ -33,7 +74,7 @@ impl VIntArray {
             push_n_set(false);
             push_n_set(false);
             push_n_set(true);
-        }else{
+        }else {
             push_n_set(false);
             push_n_set(false);
             push_n_set(false);
@@ -102,8 +143,16 @@ impl<'a> Iterator for VintArrayIterator<'a> {
                     let has_more = self.list.get_apply_bits(self.pos, 2, &mut val);
                     self.pos += 1;
                     if has_more{
-                        self.list.get_apply_bits(self.pos, 3, &mut val);
+                        let has_more = self.list.get_apply_bits(self.pos, 3, &mut val);
                         self.pos += 1;
+                        if has_more{
+                            let el = unsafe{*self.list.data.get_unchecked(self.pos) };
+                            let bytes: [u8; 4] = [0, 0, 0, el];
+                            let mut add_val: u32 = unsafe { transmute(bytes) };
+                            add_val <<= 4;
+                            val |= add_val as u32;
+                            self.pos += 1;
+                        }
                     }
                 }
             }
@@ -119,3 +168,14 @@ impl<'a> Iterator for VintArrayIterator<'a> {
 
 
 }
+
+
+#[test]
+fn test_encode_decode_vint_very_large_number() {
+    let mut vint = VIntArray::default();
+    let dat = vec![4_000_000_000];
+    vint.encode_vals(&dat);
+    let decoded_data:Vec<u32> = vint.iter().collect();
+    assert_eq!(&dat, &decoded_data);
+}
+
