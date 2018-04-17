@@ -97,7 +97,7 @@ pub struct VintArrayIterator<'a>  {
 
 impl<'a> VintArrayIterator<'a> {
 
-    fn new(data: & 'a [u8]) -> Self {
+    pub fn new(data: & 'a [u8]) -> Self {
         VintArrayIterator {
             data: data,
             pos: 0,
@@ -105,7 +105,7 @@ impl<'a> VintArrayIterator<'a> {
     }
 
     #[inline]
-    pub fn decode_u8(&self, pos:usize) -> (u8, bool) {
+    fn decode_u8(&self, pos:usize) -> (u8, bool) {
         unsafe{
             let el = *self.data.get_unchecked(pos);
             if is_high_bit_set(el){
