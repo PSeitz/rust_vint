@@ -84,10 +84,7 @@ impl VIntArray {
     }
 
     pub fn iter(& self) -> VintArrayIterator {
-        VintArrayIterator {
-            data: &self.data,
-            pos: 0,
-        }
+        VintArrayIterator::new(&self.data)
     }
 
 }
@@ -99,6 +96,14 @@ pub struct VintArrayIterator<'a>  {
 }
 
 impl<'a> VintArrayIterator<'a> {
+
+    fn new(data: & 'a [u8]) -> Self {
+        VintArrayIterator {
+            data: data,
+            pos: 0,
+        }
+    }
+
     #[inline]
     pub fn decode_u8(&self, pos:usize) -> (u8, bool) {
         unsafe{

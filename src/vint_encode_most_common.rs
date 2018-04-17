@@ -292,7 +292,7 @@ fn test_encode_decode_vint_most_common_single() {
 
 
 #[test]
-fn test_encode_decode_vint_very_large_number() {
+fn test_encode_decode_vint_most_common_very_large_number() {
     let mut vint = VIntArrayEncodeMostCommon::default();
     let dat = vec![4_000_000_000];
     vint.encode_vals(&dat);
