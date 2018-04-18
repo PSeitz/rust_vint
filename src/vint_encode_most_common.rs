@@ -31,6 +31,17 @@ fn get_bytes_required(val:u32) -> BytesRequired {
     }
 }
 
+/// VIntArrayEncodeMostCommon reserves one bit to encode the most common element as the following element.
+///
+/// `0b11000000`
+///
+/// So the upper limits to encode values are halfed.
+/// 0    -  2^6     -> 1 byte
+/// 2^6  -  2^13    -> 2 byte
+/// 2^13 -  2^20    -> 3 byte
+/// 2^20 -  2^27    -> 4 byte
+/// 2^27 >          -> 5 byte
+///
 impl VIntArrayEncodeMostCommon {
 
     pub fn get_space_used_by_most_common_val(&mut self, vals: &[u32]) -> (u32, u32) {
