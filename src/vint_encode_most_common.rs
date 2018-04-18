@@ -31,6 +31,26 @@ fn get_bytes_required(val:u32) -> BytesRequired {
     }
 }
 
+use serde::ser::{Serialize, Serializer, SerializeSeq, SerializeMap, SerializeStruct};
+
+impl Serialize for VIntArrayEncodeMostCommon
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where S: Serializer
+    {
+        let mut state = serializer.serialize_struct("VIntArrayEncodeMostCommon", 3)?;
+        state.serialize_field("data", &self.data)?;
+        state.serialize_field("most_common_val", &self.most_common_val.unwrap_or(0))?;
+        state.end()
+        // serializer.serialize_u32(self.most_common_val.unwrap_or(0));
+        // let mut seq = serializer.serialize_seq(Some(self.data.len()))?;
+        // for e in self.data.iter() {
+        //     seq.serialize_element(e)?;
+        // }
+        // seq.end()
+    }
+}
+
 /// VIntArrayEncodeMostCommon reserves one bit to encode the most common element as the following element.
 ///
 /// `0b11000000`

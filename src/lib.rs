@@ -16,6 +16,8 @@ extern crate test;
 extern crate rand;
 extern crate fnv;
 
+extern crate serde;
+
 #[cfg(test)]
 extern crate quickcheck;
 
