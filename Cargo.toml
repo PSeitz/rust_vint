@@ -6,6 +6,9 @@ authors = ["Pascal Seitz <pascal.seitz@gmail.com>"]
 [dependencies]
 bitfield = "0.12.1"
 serde = "1.0"
+serde_derive = "1.0"
+serde_bytes = "0.10.4"
+bincode = "1.0.0"
 rand = "0.4"
 snap = "0.2"
 fnv = "1.0.3"

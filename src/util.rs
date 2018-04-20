@@ -1,14 +1,15 @@
+use vint;
 
 // #[inline]
 // pub fn set_bit_at(input: &mut u8, n: u8) {
 //     *input |= 1 << n
 // }
 
-const ONLY_HIGH_BIT_U8:u8 = 0b_1000_0000;
-const ONLY_SECOND_HIGH_BIT_U8:u8 = 0b_0100_0000;
+const ONLY_HIGH_BIT_U8: u8 = 0b_1000_0000;
+const ONLY_SECOND_HIGH_BIT_U8: u8 = 0b_0100_0000;
 
 #[inline]
-pub fn set_high_bit_u8(input: u8) -> u8{
+pub fn set_high_bit_u8(input: u8) -> u8 {
     input | ONLY_HIGH_BIT_U8
 }
 
@@ -27,10 +28,15 @@ pub fn is_high_bit_set(input: u8) -> bool {
 }
 
 #[inline]
-pub fn set_second_high_bit_u8(input: u8) -> u8{
+pub fn set_second_high_bit_u8(input: u8) -> u8 {
     input | ONLY_SECOND_HIGH_BIT_U8
 }
 #[inline]
 pub fn is_second_high_bit_set(input: u8) -> bool {
     input & ONLY_SECOND_HIGH_BIT_U8 != 0
+}
+
+pub fn push_compact(num: u32, data: &mut Vec<u8>) {
+    let (slice, len) = vint::encode_num(num);
+    data.extend_from_slice(&slice[..len as usize]);
 }

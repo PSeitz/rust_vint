@@ -1,11 +1,12 @@
+use vint::VintArrayIterator;
 use fnv::FnvHashMap;
 use std::mem::transmute;
 use util::*;
 
 #[derive(Debug, Clone, Default)]
-pub struct VIntArrayEncodeMostCommon{
+pub struct VIntArrayEncodeMostCommon {
     pub data: Vec<u8>,
-    pub most_common_val: Option<u32>
+    pub most_common_val: Option<u32>,
 }
 
 #[derive(Debug)]
@@ -17,37 +18,18 @@ enum BytesRequired {
     Five,
 }
 
-fn get_bytes_required(val:u32) -> BytesRequired {
-    if val < 1 << 6 { //64  1 byte for most_common, 1 bit to signal more
+fn get_bytes_required(val: u32) -> BytesRequired {
+    if val < 1 << 6 {
+        //64  1 byte for most_common, 1 bit to signal more
         BytesRequired::One
-    }else if val < 1 << 13 {
+    } else if val < 1 << 13 {
         BytesRequired::Two
-    }else if val < 1 << 20 {
+    } else if val < 1 << 20 {
         BytesRequired::Three
-    }else if val < 1 << 27 {
+    } else if val < 1 << 27 {
         BytesRequired::Four
-    }else{
+    } else {
         BytesRequired::Five
-    }
-}
-
-use serde::ser::{Serialize, Serializer, SerializeSeq, SerializeMap, SerializeStruct};
-
-impl Serialize for VIntArrayEncodeMostCommon
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
-    {
-        let mut state = serializer.serialize_struct("VIntArrayEncodeMostCommon", 3)?;
-        state.serialize_field("data", &self.data)?;
-        state.serialize_field("most_common_val", &self.most_common_val.unwrap_or(0))?;
-        state.end()
-        // serializer.serialize_u32(self.most_common_val.unwrap_or(0));
-        // let mut seq = serializer.serialize_seq(Some(self.data.len()))?;
-        // for e in self.data.iter() {
-        //     seq.serialize_element(e)?;
-        // }
-        // seq.end()
     }
 }
 
@@ -63,7 +45,6 @@ impl Serialize for VIntArrayEncodeMostCommon
 /// 2^27 >          -> 5 byte
 ///
 impl VIntArrayEncodeMostCommon {
-
     pub fn get_space_used_by_most_common_val(&mut self, vals: &[u32]) -> (u32, u32) {
         // calculate needed size of value
         let val_by_size = vals.iter().fold(FnvHashMap::default(), |mut m, val| {
@@ -71,12 +52,28 @@ impl VIntArrayEncodeMostCommon {
             m
         });
 
-        let el_with_most_space = val_by_size.iter().max_by_key(|(_, val)| *val).map(|(key, val)| (*key, *val)).unwrap();
+        let el_with_most_space = val_by_size
+            .iter()
+            .max_by_key(|(_, val)| *val)
+            .map(|(key, val)| (*key, *val))
+            .unwrap();
         el_with_most_space
     }
 
+    #[inline]
+    pub fn serialize(&self) -> Vec<u8> {
+        let mut serialized = Vec::with_capacity(self.data.len() + 4);
+         // encode values, as normal vint
+        push_compact(self.data.len() as u32, &mut serialized);
+        push_compact(self.most_common_val.unwrap_or(0), &mut serialized);
+        serialized.extend_from_slice(&self.data);
+        serialized
+    }
+
     pub fn encode_vals(&mut self, vals: &[u32]) {
-        if vals.is_empty() {return;}
+        if vals.is_empty() {
+            return;
+        }
         if self.most_common_val.is_none() {
             let (most_common_val, _space_used) = self.get_space_used_by_most_common_val(vals);
             self.most_common_val = Some(most_common_val);
@@ -88,21 +85,22 @@ impl VIntArrayEncodeMostCommon {
                 if **next_val == self.most_common_val.unwrap() {
                     self.encode(*val, true);
                     move_iter = true;
-                }else{
+                } else {
                     self.encode(*val, false);
                 }
-            }else{
+            } else {
                 self.encode(*val, false);
             }
-            if move_iter{iter.next();};  // move_iter, because next val is already encoded
+            if move_iter {
+                iter.next(); // move_iter, because next val is already encoded
+            };
         }
-
     }
 
-    fn encode_large(&mut self, val:u32, next_is_most_common_val: bool) {
+    fn encode_large(&mut self, val: u32, next_is_most_common_val: bool) {
         let mut pos = 0;
         let mut el = val;
-        let mut push_n_set = |last_block: bool|{
+        let mut push_n_set = |last_block: bool| {
             if pos == 4 {
                 let mut el_u64: u64 = val as u64;
                 el_u64 <<= 5;
@@ -118,19 +116,19 @@ impl VIntArrayEncodeMostCommon {
             if is_first_block {
                 if next_is_most_common_val {
                     byte = set_second_high_bit_u8(byte);
-                }else{
+                } else {
                     byte = unset_second_high_bit_u8(byte);
                 }
             }
             if last_block {
                 self.data.push(byte);
-            }else{
+            } else {
                 self.data.push(set_high_bit_u8(byte));
             }
-            if pos == 0{
+            if pos == 0 {
                 el <<= 1;
             }
-            pos +=1;
+            pos += 1;
         };
 
         push_n_set(false);
@@ -140,16 +138,16 @@ impl VIntArrayEncodeMostCommon {
         push_n_set(true);
     }
 
-    fn encode(&mut self, val:u32, next_is_most_common_val: bool) {
+    fn encode(&mut self, val: u32, next_is_most_common_val: bool) {
         let bytes_req = get_bytes_required(val);
-        if  val >= 1 << 27{
+        if val >= 1 << 27 {
             self.encode_large(val, next_is_most_common_val);
             return;
         }
 
         let mut pos = 0;
         let mut el = val;
-        let mut push_n_set = |last_block: bool|{
+        let mut push_n_set = |last_block: bool| {
             let is_first_block = pos == 0;
             if pos > 0 {
                 el <<= 1;
@@ -158,86 +156,94 @@ impl VIntArrayEncodeMostCommon {
             if is_first_block {
                 if next_is_most_common_val {
                     byte = set_second_high_bit_u8(byte);
-                }else{
+                } else {
                     byte = unset_second_high_bit_u8(byte);
                 }
             }
             if last_block {
                 self.data.push(byte);
-            }else{
+            } else {
                 self.data.push(set_high_bit_u8(byte));
             }
-            if pos == 0{
+            if pos == 0 {
                 el <<= 1;
             }
-            pos +=1;
+            pos += 1;
         };
 
         match bytes_req {
             BytesRequired::One => {
                 push_n_set(true);
-            },
+            }
             BytesRequired::Two => {
                 push_n_set(false);
                 push_n_set(true);
-            },
+            }
             BytesRequired::Three => {
                 push_n_set(false);
                 push_n_set(false);
                 push_n_set(true);
-            },
+            }
             BytesRequired::Four => {
                 push_n_set(false);
                 push_n_set(false);
                 push_n_set(false);
                 push_n_set(true);
-            },
+            }
             _ => {
                 panic!("should not happen");
             }
         }
-
     }
 
-    pub fn iter(& self) -> VintArrayMostCommonIterator {
-        VintArrayMostCommonIterator::new(&self.data, self.most_common_val.unwrap_or(0) )
+    pub fn iter(&self) -> VintArrayMostCommonIterator {
+        VintArrayMostCommonIterator::new(&self.data, self.most_common_val.unwrap_or(0))
     }
-
 }
 
 #[derive(Debug, Clone)]
-pub struct VintArrayMostCommonIterator<'a>  {
-    data: & 'a [u8],
-    pos:usize,
+pub struct VintArrayMostCommonIterator<'a> {
+    data: &'a [u8],
+    pos: usize,
     next_val: Option<u32>,
-    most_common_val: u32
+    most_common_val: u32,
 }
 
 impl<'a> VintArrayMostCommonIterator<'a> {
-
-    pub fn new(data: &'a[u8], most_common_val: u32) -> Self {
+    pub fn new(data: &'a [u8], most_common_val: u32) -> Self {
         VintArrayMostCommonIterator {
             data: data,
             pos: 0,
             next_val: None,
-            most_common_val: most_common_val
+            most_common_val: most_common_val,
         }
     }
 
     #[inline]
-    fn decode_u8(&self, pos:usize) -> (u8, bool) {
-        unsafe{
+    pub fn from_slice(data:&'a [u8]) -> Self {
+        let mut iter = VintArrayIterator::new(data); // the first two, are encoded as normal vint
+        if let Some(size) = iter.next() {
+            let most_common_val = iter.next().expect("wrong vint format, expexted most_common_val, but got nothing");
+            VintArrayMostCommonIterator::new(&data[iter.pos .. iter.pos + size as usize], most_common_val)
+        }else{
+            VintArrayMostCommonIterator::new(&data[..0], 0)
+        }
+    }
+
+    #[inline]
+    fn decode_u8(&self, pos: usize) -> (u8, bool) {
+        unsafe {
             let el = *self.data.get_unchecked(pos);
-            if is_high_bit_set(el){
+            if is_high_bit_set(el) {
                 (unset_high_bit_u8(el), true)
-            }else{
+            } else {
                 (el, false)
             }
         }
     }
 
     #[inline]
-    fn get_apply_bits(&self, pos:usize, offset:usize, val: &mut u32) -> bool {
+    fn get_apply_bits(&self, pos: usize, offset: usize, val: &mut u32) -> bool {
         let (val_u8, has_more) = self.decode_u8(pos);
 
         let mut bytes: [u8; 4] = [0, 0, 0, 0];
@@ -248,7 +254,6 @@ impl<'a> VintArrayMostCommonIterator<'a> {
 
         has_more
     }
-
 }
 
 impl<'a> Iterator for VintArrayMostCommonIterator<'a> {
@@ -263,25 +268,25 @@ impl<'a> Iterator for VintArrayMostCommonIterator<'a> {
 
         if self.pos == self.data.len() {
             None
-        }else {
+        } else {
             let (mut val_u8, has_more) = self.decode_u8(self.pos);
-            if is_second_high_bit_set(val_u8){
+            if is_second_high_bit_set(val_u8) {
                 val_u8 = unset_second_high_bit_u8(val_u8);
                 self.next_val = Some(self.most_common_val);
             }
             self.pos += 1;
             let mut val = val_u8 as u32;
-            if has_more{
+            if has_more {
                 let has_more = self.get_apply_bits(self.pos, 1, &mut val);
                 self.pos += 1;
-                if has_more{
+                if has_more {
                     let has_more = self.get_apply_bits(self.pos, 2, &mut val);
                     self.pos += 1;
-                    if has_more{
+                    if has_more {
                         let has_more = self.get_apply_bits(self.pos, 3, &mut val);
                         self.pos += 1;
-                        if has_more{
-                            let el = unsafe{*self.data.get_unchecked(self.pos) };
+                        if has_more {
+                            let el = unsafe { *self.data.get_unchecked(self.pos) };
                             let bytes: [u8; 8] = [0, 0, 0, 0, el, 0, 0, 0];
                             let mut add_val: u64 = unsafe { transmute(bytes) };
                             add_val >>= 5;
@@ -293,14 +298,37 @@ impl<'a> Iterator for VintArrayMostCommonIterator<'a> {
             }
             Some(val)
         }
-
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.data.len()-self.pos / 2, Some(self.data.len()-self.pos))
+        (
+            self.data.len() - self.pos / 2,
+            Some(self.data.len() - self.pos),
+        )
     }
+}
 
+#[test]
+fn test_serialize() {
+    let mut vint = VIntArrayEncodeMostCommon::default();
+    let dat = vec![4_000, 1_000, 2_000, 4_000, 4_000];
+    vint.encode_vals(&dat);
+
+    let data = vint.serialize();
+
+    let iter = VintArrayMostCommonIterator::from_slice(&data);
+    let decoded_data: Vec<u32> = iter.collect();
+    assert_eq!(&dat, &decoded_data);
+}
+
+#[test]
+fn test_empty_iter() {
+    let dat = vec![];
+    let iter = VintArrayMostCommonIterator::from_slice(&dat);
+    let decoded_data: Vec<u32> = iter.collect();
+    let nothing: Vec<u32> = vec![];
+    assert_eq!(nothing, decoded_data);
 }
 
 #[test]
@@ -308,7 +336,16 @@ fn test_encode_decode_vint_most_common_1000() {
     let mut vint = VIntArrayEncodeMostCommon::default();
     let dat = vec![1000, 1000, 1000];
     vint.encode_vals(&dat);
-    let decoded_data:Vec<u32> = vint.iter().collect();
+    let decoded_data: Vec<u32> = vint.iter().collect();
+    assert_eq!(&dat, &decoded_data);
+}
+
+#[test]
+fn test_encode_decode_vint_most_common_testo() {
+    let mut vint = VIntArrayEncodeMostCommon::default();
+    let dat = vec![4_000, 1_000, 2_000, 4_000, 4_000];
+    vint.encode_vals(&dat);
+    let decoded_data: Vec<u32> = vint.iter().collect();
     assert_eq!(&dat, &decoded_data);
 }
 
@@ -317,16 +354,15 @@ fn test_encode_decode_vint_most_common_single() {
     let mut vint = VIntArrayEncodeMostCommon::default();
     let dat = vec![10];
     vint.encode_vals(&dat);
-    let decoded_data:Vec<u32> = vint.iter().collect();
+    let decoded_data: Vec<u32> = vint.iter().collect();
     assert_eq!(&dat, &decoded_data);
 }
-
 
 #[test]
 fn test_encode_decode_vint_most_common_very_large_number() {
     let mut vint = VIntArrayEncodeMostCommon::default();
     let dat = vec![4_000_000_000];
     vint.encode_vals(&dat);
-    let decoded_data:Vec<u32> = vint.iter().collect();
+    let decoded_data: Vec<u32> = vint.iter().collect();
     assert_eq!(&dat, &decoded_data);
 }
