@@ -4,6 +4,7 @@ extern crate vint;
 
 extern crate byteorder;
 extern crate snap;
+extern crate mayda;
 
 use byteorder::{ByteOrder, LittleEndian};
 
@@ -60,14 +61,22 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     let parameters = vec![1, 2, 25, 250, 2_500, 25_000, 250_000, 2_500_000];
     let benchmark = ParameterizedBenchmark::new(
-        "baseline", |b, i| {
+        "mayda", |b, i| {
+            use mayda::{Access, Encode, Monotone};
+            let dat: Vec<u32> = (1..*i).map(|i| pseudo_rand(i)).collect();
+            let mut bits = Monotone::new();
+            bits.encode(&dat).unwrap();
+
+            b.iter(|| bits.decode())
+        }
+        , parameters)
+        .with_function("baseline", |b, i| {
             let mut data: Vec<u32> = vec![];
             for i in 1..*i {
                 data.push(pseudo_rand(i));
             }
             b.iter(|| data.iter().cloned().collect::<Vec<u32>>())
-        }
-        , parameters)
+        })
         .with_function("vint", |b, i| {
             let mut vint = VIntArray::default();
             for i in 1..*i {

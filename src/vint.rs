@@ -1,4 +1,4 @@
-use serde::ser::{Serialize, Serializer, SerializeSeq, SerializeStruct, SerializeTuple, SerializeMap};
+use serde::ser::{Serialize, Serializer, SerializeTuple};
 use std::mem::transmute;
 use util::*;
 

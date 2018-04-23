@@ -80,7 +80,7 @@ pub fn vec_with_size_uninitialized<T>(size: usize) -> Vec<T> {
     }
     buffer
 }
-use byteorder::{ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
+use byteorder::{ByteOrder, LittleEndian};
 pub fn vec_to_bytes_u32(data: &[u32]) -> Vec<u8> {
     let mut wtr: Vec<u8> = vec_with_size_uninitialized(data.len() * std::mem::size_of::<u32>());
     LittleEndian::write_u32_into(data, &mut wtr);
@@ -132,7 +132,7 @@ mod tests {
         let mut vint = VIntArray::default();
 
         // let dat:Vec<u32> = vec![10, 23, 788, 1, 1, 300, 1,  1, 1, 1, 1,];
-        let dat:Vec<u32> = (0..4000).collect();
+        let dat:Vec<u32> = (0..1).collect();
         vint.encode_vals(&dat);
 
         use bincode::serialize;
@@ -157,7 +157,7 @@ mod tests {
             .write_all(&vint_common.serialize())
             .unwrap();
 
-        use mayda::{Access, Encode, Monotone};
+        use mayda::{Encode, Monotone};
         let mut bits = Monotone::new();
         bits.encode(&dat).unwrap();
 
@@ -169,10 +169,7 @@ mod tests {
             .unwrap();
 
         let vals = bytes_to_vec_u32(&bytes);
-        let mut bits: Monotone<u32> = Monotone::new();
-        {
-            bits.storage = vals.into_boxed_slice();
-        }
+        let bits: Monotone<u32> = Monotone::from_storage(vals.into_boxed_slice());
         assert_eq!(bits.decode(), dat);
 
     }

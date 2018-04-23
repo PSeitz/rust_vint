@@ -9,7 +9,7 @@ serde = "1.0"
 serde_derive = "1.0"
 serde_bytes = "0.10.4"
 bincode = "1.0.0"
-mayda = {path = "../mayda"}
+mayda = {git = "https://github.com/PSeitz/mayda"}
 rand = "0.4"
 snap = "0.2"
 fnv = "1.0.3"
