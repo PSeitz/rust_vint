@@ -89,6 +89,22 @@ impl VIntArray {
     }
 
     #[inline]
+    /// decodes data from a slice and returns the total size of the data in the slice in bytes
+    pub fn decode_from_slice(data: &[u8]) -> (Vec<u32>, u32) {
+        let mut iter = VintArrayIterator::new(data); // the first two, are encoded as normal vint
+        if let Some(size) = iter.next() {
+            let mut iter_data = VintArrayIterator::new(&data[iter.pos .. iter.pos + size as usize]);
+            let mut data = vec![];
+            while let Some(el) = iter_data.next() {
+                data.push(el);
+            }
+            (data, iter.pos as u32 + iter_data.pos as u32)
+        }else{
+            (vec![], iter.pos as u32)
+        }
+    }
+
+    #[inline]
     pub fn serialize(&self) -> Vec<u8> {
         let mut serialized = Vec::with_capacity(self.data.len() + 4);
         push_compact(self.data.len() as u32, &mut serialized);

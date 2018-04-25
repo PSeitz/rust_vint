@@ -70,6 +70,23 @@ impl VIntArrayEncodeMostCommon {
         serialized
     }
 
+    #[inline]
+    /// decodes data from a slice and returns the total size of the data in the slice in bytes
+    pub fn decode_from_slice(data: &[u8]) -> (Vec<u32>, u32) {
+        let mut iter = VintArrayIterator::new(data); // the first two, are encoded as normal vint
+        if let Some(size) = iter.next() {
+            let most_common_val = iter.next().expect("wrong vint format, expexted most_common_val, but got nothing");
+            let mut iter_data = VintArrayMostCommonIterator::new(&data[iter.pos .. iter.pos + size as usize], most_common_val);
+            let mut data = vec![];
+            while let Some(el) = iter_data.next() {
+                data.push(el);
+            }
+            (data, iter.pos as u32 + iter_data.pos as u32)
+        }else{
+            (vec![], iter.pos as u32)
+        }
+    }
+
     pub fn encode_vals(&mut self, vals: &[u32]) {
         if vals.is_empty() {
             return;
