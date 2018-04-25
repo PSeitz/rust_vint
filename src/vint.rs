@@ -23,7 +23,7 @@ impl Serialize for VIntArray {
     }
 }
 
-/// Only split for perforamnce reasons
+/// Only split for performance reasons
 #[inline]
 pub fn push_n_set_big(val: u32, data: &mut [u8]) {
     let mut el_u64: u64 = val as u64;
@@ -109,7 +109,7 @@ impl VIntArray {
 
 #[derive(Debug, Clone)]
 pub struct VintArrayIterator<'a> {
-    data: &'a [u8],
+    pub data: &'a [u8],
     /// the current offset in the slice
     pub pos: usize,
 }

@@ -203,10 +203,10 @@ impl VIntArrayEncodeMostCommon {
 
 #[derive(Debug, Clone)]
 pub struct VintArrayMostCommonIterator<'a> {
-    data: &'a [u8],
-    pos: usize,
+    pub data: &'a [u8],
+    pub pos: usize,
     next_val: Option<u32>,
-    most_common_val: u32,
+    pub most_common_val: u32,
 }
 
 impl<'a> VintArrayMostCommonIterator<'a> {
