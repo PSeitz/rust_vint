@@ -27,7 +27,7 @@ extern crate quickcheck;
 
 extern crate bincode;
 extern crate byteorder;
-
+#[macro_use] extern crate itertools;
 
 pub mod vint;
 // pub mod vint_fixed;

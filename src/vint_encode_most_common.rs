@@ -2,6 +2,7 @@ use vint::VintArrayIterator;
 use fnv::FnvHashMap;
 use std::mem::transmute;
 use util::*;
+use itertools::Itertools;
 
 #[derive(Debug, Clone, Default)]
 pub struct VIntArrayEncodeMostCommon {
@@ -46,24 +47,27 @@ fn get_bytes_required(val: u32) -> BytesRequired {
 ///
 impl VIntArrayEncodeMostCommon {
     pub fn get_space_used_by_most_common_val(&mut self, vals: &[u32]) -> (u32, u32) {
-        // calculate needed size of value
-        let val_by_size = vals.iter().fold(FnvHashMap::default(), |mut m, val| {
-            *m.entry(*val).or_insert(0) += get_bytes_required(*val) as u32;
-            m
-        });
+        let mut newvec:Vec<u32> = vals.to_vec();
+        newvec.sort_unstable();
 
-        let el_with_most_space = val_by_size
-            .iter()
-            .max_by_key(|(_, val)| *val)
-            .map(|(key, val)| (*key, *val))
-            .unwrap();
-        el_with_most_space
+        let mut current_biggest_el = 0;
+        let  mut current_biggest_el_bytes_required = 0;
+        for (el, group) in &newvec.iter().group_by(|el|*el) {
+            let bytes_required = get_bytes_required(*el) as u32;
+            let total_bytes_required = group.count() as u32 * bytes_required;
+            if total_bytes_required > current_biggest_el_bytes_required {
+                current_biggest_el_bytes_required = total_bytes_required;
+                current_biggest_el = *el;
+            }
+        }
+        (current_biggest_el, current_biggest_el_bytes_required)
+
     }
 
     #[inline]
     pub fn serialize(&self) -> Vec<u8> {
         let mut serialized = Vec::with_capacity(self.data.len() + 4);
-         // encode values, as normal vint
+        // encode values, as normal vint
         push_compact(self.data.len() as u32, &mut serialized);
         push_compact(self.most_common_val.unwrap_or(0), &mut serialized);
         serialized.extend_from_slice(&self.data);
