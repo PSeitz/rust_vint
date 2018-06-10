@@ -1,6 +1,6 @@
 use vint::VintArrayIterator;
-use fnv::FnvHashMap;
 use std::mem::transmute;
+use std::iter::FusedIterator;
 use util::*;
 use itertools::Itertools;
 
@@ -329,6 +329,8 @@ impl<'a> Iterator for VintArrayMostCommonIterator<'a> {
         )
     }
 }
+
+impl<'a> FusedIterator for VintArrayMostCommonIterator<'a> {}
 
 #[test]
 fn test_serialize() {

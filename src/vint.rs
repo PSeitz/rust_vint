@@ -1,6 +1,7 @@
 use serde::ser::{Serialize, Serializer, SerializeTuple};
 use std::mem::transmute;
 use util::*;
+use std::iter::FusedIterator;
 
 #[derive(Deserialize, Debug, Clone, Default)]
 pub struct VIntArray {
@@ -214,6 +215,7 @@ impl<'a> Iterator for VintArrayIterator<'a> {
     }
 }
 
+impl<'a> FusedIterator for VintArrayIterator<'a> {}
 
 #[test]
 fn test_encode_decode_vint_very_large_number() {
