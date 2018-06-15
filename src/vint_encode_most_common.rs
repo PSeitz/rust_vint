@@ -10,6 +10,8 @@ pub struct VIntArrayEncodeMostCommon {
     pub most_common_val: Option<u32>,
 }
 
+const BITS_NEEDED_FOR_MOST_COMMON_ENCODING:usize = 1;
+
 #[derive(Debug)]
 enum BytesRequired {
     One = 1,
@@ -162,12 +164,12 @@ impl VIntArrayEncodeMostCommon {
     fn encode(&mut self, val: u32, next_is_most_common_val: bool) {
         let bytes_req = get_bytes_required(val);
         if val >= 1 << 27 {
-            self.encode_large(val, next_is_most_common_val);
+            self.encode_large(val.to_le(), next_is_most_common_val);
             return;
         }
 
         let mut pos = 0;
-        let mut el = val;
+        let mut el = val.to_le();
         let mut push_n_set = |last_block: bool| {
             let is_first_block = pos == 0;
             if pos > 0 {
@@ -270,12 +272,13 @@ impl<'a> VintArrayMostCommonIterator<'a> {
         let mut bytes: [u8; 4] = [0, 0, 0, 0];
         bytes[offset] = val_u8;
         let mut add_val: u32 = unsafe { transmute(bytes) };
-        add_val >>= offset + 1;
+        add_val >>= offset + BITS_NEEDED_FOR_MOST_COMMON_ENCODING;
         *val |= add_val;
 
         has_more
     }
 }
+
 
 impl<'a> Iterator for VintArrayMostCommonIterator<'a> {
     type Item = u32;
@@ -317,7 +320,7 @@ impl<'a> Iterator for VintArrayMostCommonIterator<'a> {
                     }
                 }
             }
-            Some(val)
+            Some(u32::from_le(val))
         }
     }
 
@@ -344,6 +347,19 @@ fn test_serialize() {
     let decoded_data: Vec<u32> = iter.collect();
     assert_eq!(&dat, &decoded_data);
 }
+
+#[test]
+fn test_serialize_and_recreate_from_slice() {
+    let mut vint = VIntArrayEncodeMostCommon::default();
+    let dat = vec![4_000, 1_000, 2_000, 4_000, 4_000];
+    vint.encode_vals(&dat);
+
+    let data = vint.serialize();
+
+    let (data, _) = VIntArrayEncodeMostCommon::decode_from_slice(&data);
+    assert_eq!(&dat, &data);
+}
+
 
 #[test]
 fn test_empty_iter() {

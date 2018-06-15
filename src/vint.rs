@@ -34,7 +34,7 @@ pub fn push_n_set_big(val: u32, data: &mut [u8]) {
 }
 
 #[inline]
-pub fn push_n_set(last_block: bool, el: &mut u32, pos: &mut u8, data: &mut [u8]) {
+pub(crate) fn push_n_set(last_block: bool, el: &mut u32, pos: &mut u8, data: &mut [u8]) {
     if *pos > 0 {
         *el <<= 1;
     }
@@ -50,7 +50,7 @@ pub fn push_n_set(last_block: bool, el: &mut u32, pos: &mut u8, data: &mut [u8])
 
 #[inline]
 pub fn encode_num(val: u32) -> ([u8; 8], u8) {
-    let mut el = val;
+    let mut el = val.to_le();
 
     let mut data = [0, 0, 0, 0, 0, 0, 0, 0];
     let mut pos: u8 = 0;
@@ -75,7 +75,7 @@ pub fn encode_num(val: u32) -> ([u8; 8], u8) {
         push_n_set(false, &mut el, &mut pos, &mut data);
         push_n_set(false, &mut el, &mut pos, &mut data);
         push_n_set(false, &mut el, &mut pos, &mut data);
-        push_n_set_big(val, &mut data);
+        push_n_set_big(val.to_le(), &mut data);
         pos += 1;
     }
     (data, pos)
@@ -171,6 +171,7 @@ impl<'a> VintArrayIterator<'a> {
         has_more
     }
 }
+
 impl<'a> Iterator for VintArrayIterator<'a> {
     type Item = u32;
 
@@ -202,7 +203,7 @@ impl<'a> Iterator for VintArrayIterator<'a> {
                     }
                 }
             }
-            Some(val)
+            Some(u32::from_le(val))
         }
     }
 
@@ -238,5 +239,19 @@ fn test_serialize() {
     let decoded_data: Vec<u32> = iter.collect();
     assert_eq!(&dat, &decoded_data);
 }
+
+
+#[test]
+fn test_serialize_and_recreate_from_slice() {
+    let mut vint = VIntArray::default();
+    let dat = vec![4_000, 1_000, 2_000, 4_000, 4_000];
+    vint.encode_vals(&dat);
+
+    let data = vint.serialize();
+
+    let (data, _) = VIntArray::decode_from_slice(&data);
+    assert_eq!(&dat, &data);
+}
+
 
 
