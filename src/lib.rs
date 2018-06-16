@@ -14,7 +14,6 @@ Above we would set the high bit as signal bit to read the next byte. e.g 136 -> 
 #![plugin(quickcheck_macros)]
 extern crate fnv;
 extern crate rand;
-extern crate mayda;
 extern crate test;
 
 #[macro_use]
@@ -30,26 +29,14 @@ extern crate byteorder;
 #[macro_use] extern crate itertools;
 
 pub mod vint;
-// pub mod vint_fixed;
 pub mod vint_encode_most_common;
 mod util;
 
 #[cfg(test)]
 mod quick_tests {
     use vint::*;
-    // use vint_fixed::*;
     use vint_encode_most_common::*;
 
-    // #[quickcheck]
-    // fn encode_and_decoded_is_same_fixed(xs: Vec<u32>) -> bool {
-    //     let xs:Vec<u32> = xs.iter().map(|el| el / 8).collect();
-    //     let mut vint = VIntArrayFixed::default();
-    //     for el in xs.iter() {
-    //         vint.encode(*el);
-    //     }
-    //     let decoded_data:Vec<u32> = vint.iter().collect();
-    //     xs == decoded_data
-    // }
 
     #[quickcheck]
     fn encode_and_decoded_is_same(xs: Vec<u32>) -> bool {
@@ -102,7 +89,6 @@ pub fn bytes_to_vec_u32(data: &[u8]) -> Vec<u32> {
 mod tests {
     use super::*;
     use vint::*;
-    // use vint_fixed::*;
     use vint_encode_most_common::*;
 
     fn get_test_array() -> Vec<u32> {
@@ -157,20 +143,6 @@ mod tests {
             .write_all(&vint_common.serialize())
             .unwrap();
 
-        use mayda::{Encode, Monotone};
-        let mut bits = Monotone::new();
-        bits.encode(&dat).unwrap();
-
-        let bytes = vec_to_bytes_u32(bits.storage());
-
-        File::create("check_size_mayda")
-            .unwrap()
-            .write_all(&bytes)
-            .unwrap();
-
-        let vals = bytes_to_vec_u32(&bytes);
-        let bits: Monotone<u32> = Monotone::from_storage(vals.into_boxed_slice());
-        assert_eq!(bits.decode(), dat);
 
     }
 
