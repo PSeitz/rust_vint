@@ -1,28 +1,14 @@
-use serde::ser::{Serialize, Serializer, SerializeTuple};
 use std::mem::transmute;
 use util::*;
 use std::iter::FusedIterator;
 
-#[derive(Deserialize, Debug, Clone, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct VIntArray {
     // #[serde(serialize_with = "serialize_data")]
     pub data: Vec<u8>,
 }
 
 
-impl Serialize for VIntArray {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut seq = serializer.serialize_tuple(self.data.len())?;
-        seq.serialize_element(&(self.data.len() as u32))?;
-        for element in &self.data[..] {
-            seq.serialize_element(element)?;
-        }
-        seq.end()
-    }
-}
 
 /// Only split for performance reasons
 #[inline]

@@ -9,85 +9,31 @@ Above we would set the high bit as signal bit to read the next byte. e.g 136 -> 
 
 */
 
-#![feature(test)]
-#![feature(plugin)]
-#![plugin(quickcheck_macros)]
-extern crate fnv;
-extern crate rand;
-extern crate test;
 
-#[macro_use]
-extern crate serde_derive;
-extern crate serde;
-extern crate serde_bytes;
+#![feature(test)]
 
 #[cfg(test)]
-extern crate quickcheck;
+extern crate rand;
 
+#[cfg(test)]
 extern crate bincode;
+#[cfg(test)]
 extern crate byteorder;
+#[cfg(test)]
+extern crate bitpacking;
+
 #[macro_use] extern crate itertools;
 
 pub mod vint;
 pub mod vint_encode_most_common;
+pub mod average_delta_encoded;
+pub mod bitpacked_ra;
+pub mod bitpacked_ra_step;
+
 mod util;
 
 #[cfg(test)]
-mod quick_tests {
-    use vint::*;
-    use vint_encode_most_common::*;
-
-
-    #[quickcheck]
-    fn encode_and_decoded_is_same(xs: Vec<u32>) -> bool {
-        let xs: Vec<u32> = xs.iter().map(|el| el / 8).collect();
-        let mut vint = VIntArray::default();
-        vint.encode_vals(&xs);
-        let decoded_data: Vec<u32> = vint.iter().collect();
-        xs == decoded_data
-    }
-
-    #[quickcheck]
-    fn encode_and_decoded_is_same_most_common(xs: Vec<u32>) -> bool {
-        let xs: Vec<u32> = xs.iter().map(|el| el / 8).collect();
-        let mut vint = VIntArrayEncodeMostCommon::default();
-        vint.encode_vals(&xs);
-        let decoded_data: Vec<u32> = vint.iter().collect();
-        xs == decoded_data
-    }
-}
-
-
-
-#[inline]
-pub fn vec_with_size_uninitialized<T>(size: usize) -> Vec<T> {
-    let mut buffer = Vec::with_capacity(size);
-    unsafe {
-        buffer.set_len(size);
-    }
-    buffer
-}
-use byteorder::{ByteOrder, LittleEndian};
-pub fn vec_to_bytes_u32(data: &[u32]) -> Vec<u8> {
-    let mut wtr: Vec<u8> = vec_with_size_uninitialized(data.len() * std::mem::size_of::<u32>());
-    LittleEndian::write_u32_into(data, &mut wtr);
-    wtr
-}
-
-pub fn bytes_to_vec_u32(data: &[u8]) -> Vec<u32> {
-    let mut out_dat: Vec<u32> = vec_with_size_uninitialized(data.len() / std::mem::size_of::<u32>());
-    // LittleEndian::read_u32_into(&data, &mut out_dat);
-    unsafe {
-        //DANGER ZIOONNE
-        let ptr = std::mem::transmute::<*const u8, *const u32>(data.as_ptr());
-        ptr.copy_to_nonoverlapping(out_dat.as_mut_ptr(), data.len() / std::mem::size_of::<u32>());
-    }
-    out_dat
-}
-
-#[cfg(test)]
 mod tests {
-    use super::*;
     use vint::*;
     use vint_encode_most_common::*;
 
@@ -118,7 +64,7 @@ mod tests {
         let mut vint = VIntArray::default();
 
         // let dat:Vec<u32> = vec![10, 23, 788, 1, 1, 300, 1,  1, 1, 1, 1,];
-        let dat:Vec<u32> = (0..1).collect();
+        let dat:Vec<u32> = (0..128).map(|x| (x * 13)  + 4_000_307).collect();
         vint.encode_vals(&dat);
 
         use bincode::serialize;
@@ -143,6 +89,28 @@ mod tests {
             .write_all(&vint_common.serialize())
             .unwrap();
 
+
+        use bitpacking::{BitPacker4x, BitPacker};
+        // Detects if `SSE3` is available on the current computed
+        // and uses the best available implementation accordingly.
+        let bitpacker = BitPacker4x::new();
+
+        // Computes the number of bits used for each integers in the blocks.
+        // my_data is assumed to have a len of 128 for `BitPacker4x`.
+        let num_bits: u8 = bitpacker.num_bits(&dat);
+
+        // The compressed array will take exactly `num_bits * BitPacker4x::BLOCK_LEN / 8`.
+        // But it is ok to have an output with a different len as long as it is larger
+        // than this.
+        let mut compressed:Vec<u8> = vec![0u8; num_bits as usize * BitPacker4x::BLOCK_LEN / 8];
+
+        // Compress returns the len.
+        let _compressed_len = bitpacker.compress(&dat, &mut compressed[..], num_bits);
+
+        File::create("check_size_bitpack")
+            .unwrap()
+            .write_all(&compressed)
+            .unwrap();
 
     }
 

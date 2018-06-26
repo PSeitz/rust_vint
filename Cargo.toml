@@ -9,18 +9,18 @@ serde = "1.0"
 serde_derive = "1.0"
 serde_bytes = "0.10.4"
 bincode = "1.0.0"
-rand = "0.4"
-snap = "0.2"
-fnv = "1.0.3"
+bitpacking = "0.4.0"
 byteorder = "1.2.2"
-criterion = "0.2.2"
-quickcheck = "0.6"
-quickcheck_macros = "0.6"
 itertools = "0.7.8"
-
-[dev-dependencies]
-mayda = {git = "https://github.com/PSeitz/mayda"}
 
 [[bench]]
 name = "bench"
 harness = false
+
+[dev-dependencies]
+quickcheck = "0.6"
+quickcheck_macros = "0.6"
+criterion = "0.2.2"
+snap = "0.2"
+rand = "0.4"
+mayda = {git = "https://github.com/PSeitz/mayda"}

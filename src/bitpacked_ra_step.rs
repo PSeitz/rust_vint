@@ -80,17 +80,17 @@ pub fn decode_bit_packed_val(info: &EncodingInfo, index: usize) -> u32 {
 
 }
 
-#[test]
-fn test_ra_encode_bitpacked_monotone() {
-    let info:EncodingInfo = encode_vals_bitpacked_average_endcoded(&[150, 170, 175]);
+// #[test]
+// fn test_ra_encode_bitpacked_monotone() {
+//     let info:EncodingInfo = encode_vals_bitpacked_average_endcoded(&[150, 170, 175]);
 
-    // let bytes = vec_to_bytes_u32(&info.encoded);
-    // let bytes = info.encoded;
-    // decode_bit_packed_val(&bytes, info.bytes_per_element as u8, 3);
-    // assert_eq!(decode_bit_packed_val(&bytes, info.bytes_per_element as u8, 0), 150);
-    // assert_eq!(decode_bit_packed_val(&info, 0), 150);
-    assert_eq!(decode_bit_packed_val(&info, 2), 175);
-}
+//     // let bytes = vec_to_bytes_u32(&info.encoded);
+//     // let bytes = info.encoded;
+//     // decode_bit_packed_val(&bytes, info.bytes_per_element as u8, 3);
+//     // assert_eq!(decode_bit_packed_val(&bytes, info.bytes_per_element as u8, 0), 150);
+//     // assert_eq!(decode_bit_packed_val(&info, 0), 150);
+//     assert_eq!(decode_bit_packed_val(&info, 2), 175);
+// }
 
 
 
