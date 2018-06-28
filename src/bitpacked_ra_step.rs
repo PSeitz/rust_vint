@@ -1,6 +1,7 @@
 use average_delta_encoded::decode_average_encoded_delta;
 use average_delta_encoded;
 use std::ptr::copy_nonoverlapping;
+use std::mem::transmute;
 
 #[derive(Debug)]
 pub struct EncodingInfo {
@@ -11,7 +12,7 @@ pub struct EncodingInfo {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum BytesRequired {
+pub enum BytesRequired {
     One = 1,
     Two,
     Three,
@@ -29,8 +30,6 @@ fn get_bytes_required(val: u32) -> BytesRequired {
         BytesRequired::Four
     }
 }
-
-use std::mem::transmute;
 
 #[inline]
 pub fn encode_vals_bitpacked_average_endcoded(vals: &[u32]) -> EncodingInfo {
@@ -56,6 +55,27 @@ pub fn encode_vals_bitpacked_average_endcoded(vals: &[u32]) -> EncodingInfo {
     // println!("encoded {:?}", encoded);
 
     EncodingInfo{avg_increase: delta_info.avg_increase, offset: delta_info.offset, encoded, bytes_per_element:bytes_required}
+}
+
+
+#[inline]
+pub fn encode_vals(vals: &[u32], bytes_required:BytesRequired) -> (BytesRequired, Vec<u8>) {
+
+    // let max_val = *vals.iter().max().unwrap() as u32;
+    // let bytes_required = get_bytes_required(max_val);
+
+    let mut encoded:Vec<u8> = vec![];
+    let total_num_bytes = bytes_required as usize * vals.len();
+    encoded.resize(1 + total_num_bytes, 0);
+    for (i, val) in vals.iter().enumerate() {
+        let first_block = i * bytes_required as usize;
+        let data: [u8; 4] = unsafe { transmute(*val) };
+        unsafe {
+            copy_nonoverlapping(data.as_ptr(), encoded[first_block ..].as_mut_ptr(), bytes_required as usize);
+        }
+    }
+
+    (bytes_required, encoded)
 }
 
 // pub fn decode_bit_packed_val(val: &[u8], num_bits: u8, index: usize) -> u32 {

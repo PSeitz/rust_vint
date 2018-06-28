@@ -1,3 +1,4 @@
+#![feature(ptr_offset_from)]
 /*!
 Crate `vint` is a library for compressing u32 integer arrays, composed mainly by small values.
 by using only the necessary number of bytes required to encode the number.
