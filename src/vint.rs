@@ -37,7 +37,7 @@ pub fn encode_varint_into(output: &mut Vec<u8>, mut value:u32) {
 }
 
 #[inline(always)]
-pub fn encode_varint_into_writer<W:Write>(output: &mut W, mut value:u32) -> Result<(), io::Error> {
+pub fn encode_varint_into_writer<W:Write>(mut output: W, mut value:u32) -> Result<(), io::Error> {
     let do_one = |output: &mut W, value:&mut u32| -> Result<(), io::Error> {
         output.write_all(&[((*value & 127) | 128) as u8])?;
         *value >>= 7;
@@ -49,25 +49,25 @@ pub fn encode_varint_into_writer<W:Write>(output: &mut W, mut value:u32) -> Resu
     };
 
     if value < 1 << 7 { //128
-        do_last(output, value)?;
+        do_last(&mut output, value)?;
     } else if value < 1 << 14 {
-        do_one(output, &mut value)?;
-        do_last(output, value)?;
+        do_one(&mut output, &mut value)?;
+        do_last(&mut output, value)?;
     } else if value < 1 << 21 {
-        do_one(output, &mut value)?;
-        do_one(output, &mut value)?;
-        do_last(output, value)?;
+        do_one(&mut output, &mut value)?;
+        do_one(&mut output, &mut value)?;
+        do_last(&mut output, value)?;
     } else if value < 1 << 28 {
-        do_one(output, &mut value)?;
-        do_one(output, &mut value)?;
-        do_one(output, &mut value)?;
-        do_last(output, value)?;
+        do_one(&mut output, &mut value)?;
+        do_one(&mut output, &mut value)?;
+        do_one(&mut output, &mut value)?;
+        do_last(&mut output, value)?;
     } else {
-        do_one(output, &mut value)?;
-        do_one(output, &mut value)?;
-        do_one(output, &mut value)?;
-        do_one(output, &mut value)?;
-        do_last(output, value)?;
+        do_one(&mut output, &mut value)?;
+        do_one(&mut output, &mut value)?;
+        do_one(&mut output, &mut value)?;
+        do_one(&mut output, &mut value)?;
+        do_last(&mut output, value)?;
     }
     Ok(())
 }
