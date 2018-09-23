@@ -125,7 +125,7 @@ impl VIntArrayEncodeMostCommon {
         let mut el = val;
         let mut push_n_set = |last_block: bool| {
             if pos == 4 {
-                let mut el_u64: u64 = val as u64;
+                let mut el_u64: u64 = u64::from(val);
                 el_u64 <<= 5;
                 let bytes: [u8; 8] = unsafe { transmute(el_u64) };
                 self.data.push(bytes[pos]);
@@ -235,10 +235,10 @@ pub struct VintArrayMostCommonIterator<'a> {
 impl<'a> VintArrayMostCommonIterator<'a> {
     pub fn new(data: &'a [u8], most_common_val: u32) -> Self {
         VintArrayMostCommonIterator {
-            data: data,
+            data,
             pos: 0,
             next_val: None,
-            most_common_val: most_common_val,
+            most_common_val,
         }
     }
 
@@ -299,7 +299,7 @@ impl<'a> Iterator for VintArrayMostCommonIterator<'a> {
                 self.next_val = Some(self.most_common_val);
             }
             self.pos += 1;
-            let mut val = val_u8 as u32;
+            let mut val = u32::from(val_u8);
             if has_more {
                 let has_more = self.get_apply_bits(self.pos, 1, &mut val);
                 self.pos += 1;

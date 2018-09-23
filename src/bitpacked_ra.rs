@@ -39,7 +39,7 @@ pub fn encode_vals_bitpacked_average_endcoded(vals: &[u32]) -> EncodingInfo {
         }else{
             let closest_block = bit_pos - bit_pos % 32;
             // println!("closest_block {:?}", closest_block);
-            let shifted_val =  (*val as u32) << bit_pos % 32;
+            let shifted_val =  (*val as u32) << (bit_pos % 32);
             // let block = bit_pos / 32;
             encoded[closest_block as usize] |= shifted_val;
         }
@@ -119,7 +119,7 @@ pub fn vec_to_bytes_u32(data: &[u32]) -> Vec<u8> {
 fn test_ra_encode_bitpacked_monotone() {
     let info:EncodingInfo = encode_vals_bitpacked_average_endcoded(&[150, 170, 175]);
 
-    let bytes = vec_to_bytes_u32(&info.encoded);
+    let _bytes = vec_to_bytes_u32(&info.encoded);
     // decode_bit_packed_val(&bytes, info.num_bits, 3);
 }
 

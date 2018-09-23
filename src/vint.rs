@@ -1,113 +1,112 @@
-use std::mem::transmute;
-use util::*;
 use std::iter::FusedIterator;
+use std::io::Read;
 
-#[derive(Debug, Clone, Default)]
-pub struct VIntArray {
-    // #[serde(serialize_with = "serialize_data")]
-    pub data: Vec<u8>,
-}
+#[inline(always)]
+pub fn encode_varint_into(output: &mut Vec<u8>, mut value:u32) {
+    let do_one = |output: &mut Vec<u8>, value:&mut u32| {
+        output.push(((*value & 127) | 128) as u8);
+        *value >>= 7;
+    };
+    let do_last = |output: &mut Vec<u8>, value:u32| {
+        output.push((value & 127) as u8);
+    };
 
-
-
-/// Only split for performance reasons
-#[inline]
-pub fn push_n_set_big(val: u32, data: &mut [u8]) {
-    let mut el_u64: u64 = val as u64;
-    el_u64 <<= 4;
-    let bytes: [u8; 8] = unsafe { transmute(el_u64) };
-    data[4] = bytes[4];
-}
-
-#[inline]
-pub(crate) fn push_n_set(last_block: bool, el: &mut u32, pos: &mut u8, data: &mut [u8]) {
-    if *pos > 0 {
-        *el <<= 1;
-    }
-    if last_block {
-        let bytes: [u8; 4] = unsafe { transmute(*el) };
-        data[*pos as usize] = bytes[*pos as usize];
+    if value < 1 << 7 { //128
+        do_last(output, value);
+    } else if value < 1 << 14 {
+        do_one(output, &mut value);
+        do_last(output, value);
+    } else if value < 1 << 21 {
+        do_one(output, &mut value);
+        do_one(output, &mut value);
+        do_last(output, value);
+    } else if value < 1 << 28 {
+        do_one(output, &mut value);
+        do_one(output, &mut value);
+        do_one(output, &mut value);
+        do_last(output, value);
     } else {
-        let bytes: [u8; 4] = unsafe { transmute(*el) };
-        data[*pos as usize] = set_high_bit_u8(bytes[*pos as usize]);
+        do_one(output, &mut value);
+        do_one(output, &mut value);
+        do_one(output, &mut value);
+        do_one(output, &mut value);
+        do_last(output, value);
     }
-    *pos += 1;
 }
 
-#[inline]
-pub fn encode_num(val: u32) -> ([u8; 8], u8) {
-    let mut el = val.to_le();
+#[test]
+fn test_varint() {
+    let mut sink = vec![];
+    encode_varint_into(&mut sink, 5);
+    encode_varint_into(&mut sink, 127);
+    encode_varint_into(&mut sink, 128);
+    encode_varint_into(&mut sink, 50);
+    encode_varint_into(&mut sink, 500);
+    encode_varint_into(&mut sink, 5000);
+    encode_varint_into(&mut sink, 4_000_000_000);
+    assert_eq!(sink.len(), 14);
 
-    let mut data = [0, 0, 0, 0, 0, 0, 0, 0];
-    let mut pos: u8 = 0;
+    let mut iter = sink.iter().cloned();
+    assert_eq!(decode_varint(&mut iter), Some(5));
+    assert_eq!(decode_varint(&mut iter), Some(127));
+    assert_eq!(decode_varint(&mut iter), Some(128));
+    assert_eq!(decode_varint(&mut iter), Some(50));
+    assert_eq!(decode_varint(&mut iter), Some(500));
+    assert_eq!(decode_varint(&mut iter), Some(5000));
+    assert_eq!(decode_varint(&mut iter), Some(4_000_000_000));
 
-    if val < 1 << 7 {
-        //128
-        push_n_set(true, &mut el, &mut pos, &mut data);
-    } else if val < 1 << 14 {
-        push_n_set(false, &mut el, &mut pos, &mut data);
-        push_n_set(true, &mut el, &mut pos, &mut data);
-    } else if val < 1 << 21 {
-        push_n_set(false, &mut el, &mut pos, &mut data);
-        push_n_set(false, &mut el, &mut pos, &mut data);
-        push_n_set(true, &mut el, &mut pos, &mut data);
-    } else if val < 1 << 28 {
-        push_n_set(false, &mut el, &mut pos, &mut data);
-        push_n_set(false, &mut el, &mut pos, &mut data);
-        push_n_set(false, &mut el, &mut pos, &mut data);
-        push_n_set(true, &mut el, &mut pos, &mut data);
-    } else {
-        push_n_set(false, &mut el, &mut pos, &mut data);
-        push_n_set(false, &mut el, &mut pos, &mut data);
-        push_n_set(false, &mut el, &mut pos, &mut data);
-        push_n_set(false, &mut el, &mut pos, &mut data);
-        push_n_set_big(val.to_le(), &mut data);
-        pos += 1;
-    }
-    (data, pos)
+    let iter = VintArrayIterator{data: &sink, pos:0 };
+    let dat:Vec<_> = iter.collect();
+    assert_eq!(dat, vec![5, 127, 128, 50, 500, 5000, 4_000_000_000]);
+
+    use std::io::BufReader;
+    let mut reader = BufReader::new(&sink[..]);
+    assert_eq!(decode_from_reader(reader.get_mut()), Some(5));
+    assert_eq!(decode_from_reader(reader.get_mut()), Some(127));
+    assert_eq!(decode_from_reader(reader.get_mut()), Some(128));
+    assert_eq!(decode_from_reader(reader.get_mut()), Some(50));
+    assert_eq!(decode_from_reader(reader.get_mut()), Some(500));
+    assert_eq!(decode_from_reader(reader.get_mut()), Some(5000));
+    assert_eq!(decode_from_reader(reader.get_mut()), Some(4_000_000_000));
+    assert_eq!(decode_from_reader(reader.get_mut()), None);
 }
 
-impl VIntArray {
-    #[inline]
-    pub fn encode_vals(&mut self, vals: &[u32]) {
-        for val in vals {
-            self.encode(*val);
+#[inline(always)]
+pub fn decode_varint<I: Iterator<Item=u8>>(input: &mut I) -> Option<u32> {
+    let mut ret:u32 = 0;
+    if let Some(next) = input.next() {
+        ret |= u32::from(next) & 127;
+        if next & 128 == 0 {
+            return Some(ret);
         }
-    }
-
-    #[inline]
-    /// decodes data from a slice and returns the total size of the data in the slice in bytes
-    pub fn decode_from_slice(data: &[u8]) -> (Vec<u32>, u32) {
-        let mut iter = VintArrayIterator::new(data); // the first two, are encoded as normal vint
-        if let Some(size) = iter.next() {
-            let mut iter_data = VintArrayIterator::new(&data[iter.pos .. iter.pos + size as usize]);
-            let mut data = vec![];
-            while let Some(el) = iter_data.next() {
-                data.push(el);
-            }
-            (data, iter.pos as u32 + iter_data.pos as u32)
-        }else{
-            (vec![], iter.pos as u32)
+        let next = input.next().unwrap();
+        ret |= (u32::from(next) & 127) << 7;
+        if next & 128 == 0 {
+            return Some(ret);
         }
+        let next = input.next().unwrap();
+        ret |= (u32::from(next) & 127) << 14;
+        if next & 128 == 0 {
+            return Some(ret);
+        }
+        let next = input.next().unwrap();
+        ret |= (u32::from(next) & 127) << 21;
+        if next & 128 == 0 {
+            return Some(ret);
+        }
+        let next = input.next().unwrap();
+        ret |= (u32::from(next) & 127) << 28;
+        return Some(ret);
+    }else{
+        return None;
     }
 
-    #[inline]
-    pub fn serialize(&self) -> Vec<u8> {
-        let mut serialized = Vec::with_capacity(self.data.len() + 4);
-        push_compact(self.data.len() as u32, &mut serialized);
-        serialized.extend_from_slice(&self.data);
-        serialized
-    }
+}
 
-    #[inline]
-    pub fn encode(&mut self, val: u32) {
-        let (slice, len) = encode_num(val);
-        self.data.extend_from_slice(&slice[..len as usize]);
-    }
-
-    pub fn iter(&self) -> VintArrayIterator {
-        VintArrayIterator::new(&self.data)
-    }
+#[inline(always)]
+pub fn decode_from_reader<R:Read>(r:&mut R) -> Option<u32> {
+    let mut iter = r.bytes().map(|el| el.unwrap());
+    decode_varint(&mut iter)
 }
 
 #[derive(Debug, Clone)]
@@ -119,7 +118,7 @@ pub struct VintArrayIterator<'a> {
 
 impl<'a> VintArrayIterator<'a> {
     pub fn new(data: &'a [u8]) -> Self {
-        VintArrayIterator { data: data, pos: 0 }
+        VintArrayIterator { data, pos: 0 }
     }
 
     #[inline]
@@ -131,65 +130,49 @@ impl<'a> VintArrayIterator<'a> {
             VintArrayIterator::new(&data[..0])
         }
     }
-
-    #[inline]
-    fn decode_u8(&self, pos: usize) -> (u8, bool) {
-        unsafe {
-            let el = *self.data.get_unchecked(pos);
-            if is_high_bit_set(el) {
-                (unset_high_bit_u8(el), true)
-            } else {
-                (el, false)
-            }
-        }
-    }
-
-    #[inline]
-    fn get_apply_bits(&self, pos: usize, offset: usize, val: &mut u32) -> bool {
-        let (val_u8, has_more) = self.decode_u8(pos);
-
-        let mut bytes: [u8; 4] = [0, 0, 0, 0];
-        bytes[offset] = val_u8;
-        let mut add_val: u32 = unsafe { transmute(bytes) };
-        add_val >>= offset;
-        *val |= add_val;
-
-        has_more
-    }
 }
 
 impl<'a> Iterator for VintArrayIterator<'a> {
     type Item = u32;
 
-    #[inline]
+    #[inline(always)]
     fn next(&mut self) -> Option<u32> {
         if self.pos == self.data.len() {
             None
         } else {
-            let (val_u8, has_more) = self.decode_u8(self.pos);
+
+            let next = self.data[self.pos];
             self.pos += 1;
-            let mut val = val_u8 as u32;
-            if has_more {
-                let has_more = self.get_apply_bits(self.pos, 1, &mut val);
-                self.pos += 1;
-                if has_more {
-                    let has_more = self.get_apply_bits(self.pos, 2, &mut val);
-                    self.pos += 1;
-                    if has_more {
-                        let has_more = self.get_apply_bits(self.pos, 3, &mut val);
-                        self.pos += 1;
-                        if has_more {
-                            let el = unsafe { *self.data.get_unchecked(self.pos) };
-                            let bytes: [u8; 4] = [0, 0, 0, el];
-                            let mut add_val: u32 = unsafe { transmute(bytes) };
-                            add_val <<= 4;
-                            val |= add_val as u32;
-                            self.pos += 1;
-                        }
-                    }
-                }
+            let mut ret:u32 = u32::from(next) & 127;
+            if next & 128 == 0 {
+                return Some(ret);
             }
-            Some(u32::from_le(val))
+            let next = self.data[self.pos];
+            self.pos += 1;
+            let mut shift_by = 7;
+            ret |= (u32::from(next) & 127) << shift_by;
+            if next & 128 == 0 {
+                return Some(ret);
+            }
+            let next = self.data[self.pos];
+            self.pos += 1;
+            shift_by += 7;
+            ret |= (u32::from(next) & 127) << shift_by;
+            if next & 128 == 0 {
+                return Some(ret);
+            }
+            let next = self.data[self.pos];
+            self.pos += 1;
+            shift_by += 7;
+            ret |= (u32::from(next) & 127) << shift_by;
+            if next & 128 == 0 {
+                return Some(ret);
+            }
+            let next = self.data[self.pos];
+            self.pos += 1;
+            shift_by += 7;
+            ret |= (u32::from(next) & 127) << shift_by;
+            Some(ret)
         }
     }
 
@@ -203,6 +186,37 @@ impl<'a> Iterator for VintArrayIterator<'a> {
 }
 
 impl<'a> FusedIterator for VintArrayIterator<'a> {}
+
+#[derive(Debug, Clone, Default)]
+pub struct VIntArray {
+    pub data: Vec<u8>,
+}
+
+impl VIntArray {
+    #[inline]
+    pub fn encode_vals(&mut self, vals: &[u32]) {
+        for val in vals {
+            encode_varint_into(&mut self.data, *val);
+        }
+    }
+
+    #[inline]
+    pub fn serialize(&self) -> Vec<u8> {
+        let mut serialized = Vec::with_capacity(self.data.len() + 4);
+        encode_varint_into(&mut serialized, self.data.len() as u32);
+        serialized.extend_from_slice(&self.data);
+        serialized
+    }
+
+    #[inline(always)]
+    pub fn encode(&mut self, val: u32) {
+        encode_varint_into(&mut self.data, val);
+    }
+
+    pub fn iter(&self) -> VintArrayIterator {
+        VintArrayIterator::new(&self.data)
+    }
+}
 
 #[test]
 fn test_encode_decode_vint_very_large_number() {
@@ -225,19 +239,4 @@ fn test_serialize() {
     let decoded_data: Vec<u32> = iter.collect();
     assert_eq!(&dat, &decoded_data);
 }
-
-
-#[test]
-fn test_serialize_and_recreate_from_slice() {
-    let mut vint = VIntArray::default();
-    let dat = vec![4_000, 1_000, 2_000, 4_000, 4_000];
-    vint.encode_vals(&dat);
-
-    let data = vint.serialize();
-
-    let (data, _) = VIntArray::decode_from_slice(&data);
-    assert_eq!(&dat, &data);
-}
-
-
 

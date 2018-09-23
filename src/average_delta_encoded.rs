@@ -10,7 +10,7 @@ pub struct AverageEncodedDelta {
 pub fn delta_and_average_encode(vals: &[u32]) -> AverageEncodedDelta {
     // let sum:usize = vals.iter().map(|val|*val as usize).sum::<usize>();
     let avg_increase = (*vals.last().unwrap() / vals.len() as u32) as u32;
-    let mut vals:Vec<i32> = vals.iter().enumerate().map(|(pos, val)| (*val as i64 - (avg_increase as usize * (pos + 1)) as i64) as i32).collect();
+    let mut vals:Vec<i32> = vals.iter().enumerate().map(|(pos, val)| (i64::from(*val) - (avg_increase as usize * (pos + 1)) as i64) as i32).collect();
     let offset:i32 = vals.iter().min().cloned().unwrap();
     if offset < 0 {
         vals = vals.iter().map(|val| val - offset).collect();

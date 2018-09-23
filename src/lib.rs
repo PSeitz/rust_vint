@@ -22,7 +22,7 @@ extern crate byteorder;
 #[cfg(test)]
 extern crate bitpacking;
 
-#[macro_use] extern crate itertools;
+extern crate itertools;
 
 pub mod vint;
 pub mod vint_encode_most_common;
