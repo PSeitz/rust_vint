@@ -1,5 +1,7 @@
 use std::iter::FusedIterator;
 use std::io::Read;
+use std::io::Write;
+use std::io;
 
 #[inline(always)]
 pub fn encode_varint_into(output: &mut Vec<u8>, mut value:u32) {
@@ -32,6 +34,42 @@ pub fn encode_varint_into(output: &mut Vec<u8>, mut value:u32) {
         do_one(output, &mut value);
         do_last(output, value);
     }
+}
+
+#[inline(always)]
+pub fn encode_varint_into_writer<W:Write>(output: &mut W, mut value:u32) -> Result<(), io::Error> {
+    let do_one = |output: &mut W, value:&mut u32| -> Result<(), io::Error> {
+        output.write_all(&[((*value & 127) | 128) as u8])?;
+        *value >>= 7;
+        Ok(())
+    };
+    let do_last = |output: &mut W, value:u32| -> Result<(), io::Error> {
+        output.write_all(&[(value & 127) as u8])?;
+        Ok(())
+    };
+
+    if value < 1 << 7 { //128
+        do_last(output, value)?;
+    } else if value < 1 << 14 {
+        do_one(output, &mut value)?;
+        do_last(output, value)?;
+    } else if value < 1 << 21 {
+        do_one(output, &mut value)?;
+        do_one(output, &mut value)?;
+        do_last(output, value)?;
+    } else if value < 1 << 28 {
+        do_one(output, &mut value)?;
+        do_one(output, &mut value)?;
+        do_one(output, &mut value)?;
+        do_last(output, value)?;
+    } else {
+        do_one(output, &mut value)?;
+        do_one(output, &mut value)?;
+        do_one(output, &mut value)?;
+        do_one(output, &mut value)?;
+        do_last(output, value)?;
+    }
+    Ok(())
 }
 
 #[test]
