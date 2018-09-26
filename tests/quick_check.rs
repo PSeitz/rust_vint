@@ -1,8 +1,8 @@
 #![feature(plugin)]
 #![plugin(quickcheck_macros)]
 
-extern crate vint;
 extern crate quickcheck;
+extern crate vint;
 
 mod quick_tests {
     use vint::vint::*;
@@ -26,4 +26,3 @@ mod quick_tests {
         xs == decoded_data
     }
 }
-

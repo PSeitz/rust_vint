@@ -1,8 +1,8 @@
-use vint::VintArrayIterator;
-use std::mem::transmute;
-use std::iter::FusedIterator;
-use util::*;
 use itertools::Itertools;
+use std::iter::FusedIterator;
+use std::mem::transmute;
+use util::*;
+use vint::VintArrayIterator;
 
 #[derive(Debug, Clone, Default)]
 pub struct VIntArrayEncodeMostCommon {
@@ -10,7 +10,7 @@ pub struct VIntArrayEncodeMostCommon {
     pub most_common_val: Option<u32>,
 }
 
-const BITS_NEEDED_FOR_MOST_COMMON_ENCODING:usize = 1;
+const BITS_NEEDED_FOR_MOST_COMMON_ENCODING: usize = 1;
 
 #[derive(Debug)]
 enum BytesRequired {
@@ -49,12 +49,12 @@ fn get_bytes_required(val: u32) -> BytesRequired {
 ///
 impl VIntArrayEncodeMostCommon {
     pub fn get_space_used_by_most_common_val(&mut self, vals: &[u32]) -> (u32, u32) {
-        let mut newvec:Vec<u32> = vals.to_vec();
+        let mut newvec: Vec<u32> = vals.to_vec();
         newvec.sort_unstable();
 
         let mut current_biggest_el = 0;
-        let  mut current_biggest_el_bytes_required = 0;
-        for (el, group) in &newvec.iter().group_by(|el|*el) {
+        let mut current_biggest_el_bytes_required = 0;
+        for (el, group) in &newvec.iter().group_by(|el| *el) {
             let bytes_required = get_bytes_required(*el) as u32;
             let total_bytes_required = group.count() as u32 * bytes_required;
             if total_bytes_required > current_biggest_el_bytes_required {
@@ -63,7 +63,6 @@ impl VIntArrayEncodeMostCommon {
             }
         }
         (current_biggest_el, current_biggest_el_bytes_required)
-
     }
 
     #[inline]
@@ -82,13 +81,13 @@ impl VIntArrayEncodeMostCommon {
         let mut iter = VintArrayIterator::new(data); // the first two, are encoded as normal vint
         if let Some(size) = iter.next() {
             let most_common_val = iter.next().expect("wrong vint format, expexted most_common_val, but got nothing");
-            let mut iter_data = VintArrayMostCommonIterator::new(&data[iter.pos .. iter.pos + size as usize], most_common_val);
+            let mut iter_data = VintArrayMostCommonIterator::new(&data[iter.pos..iter.pos + size as usize], most_common_val);
             let mut data = vec![];
             while let Some(el) = iter_data.next() {
                 data.push(el);
             }
             (data, iter.pos as u32 + iter_data.pos as u32)
-        }else{
+        } else {
             (vec![], iter.pos as u32)
         }
     }
@@ -243,12 +242,12 @@ impl<'a> VintArrayMostCommonIterator<'a> {
     }
 
     #[inline]
-    pub fn from_slice(data:&'a [u8]) -> Self {
+    pub fn from_slice(data: &'a [u8]) -> Self {
         let mut iter = VintArrayIterator::new(data); // the first two, are encoded as normal vint
         if let Some(size) = iter.next() {
             let most_common_val = iter.next().expect("wrong vint format, expexted most_common_val, but got nothing");
-            VintArrayMostCommonIterator::new(&data[iter.pos .. iter.pos + size as usize], most_common_val)
-        }else{
+            VintArrayMostCommonIterator::new(&data[iter.pos..iter.pos + size as usize], most_common_val)
+        } else {
             VintArrayMostCommonIterator::new(&data[..0], 0)
         }
     }
@@ -278,7 +277,6 @@ impl<'a> VintArrayMostCommonIterator<'a> {
         has_more
     }
 }
-
 
 impl<'a> Iterator for VintArrayMostCommonIterator<'a> {
     type Item = u32;
@@ -326,10 +324,7 @@ impl<'a> Iterator for VintArrayMostCommonIterator<'a> {
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (
-            self.data.len() - self.pos / 2,
-            Some(self.data.len() - self.pos),
-        )
+        (self.data.len() - self.pos / 2, Some(self.data.len() - self.pos))
     }
 }
 
@@ -359,7 +354,6 @@ fn test_serialize_and_recreate_from_slice() {
     let (data, _) = VIntArrayEncodeMostCommon::decode_from_slice(&data);
     assert_eq!(&dat, &data);
 }
-
 
 #[test]
 fn test_empty_iter() {

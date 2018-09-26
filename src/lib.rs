@@ -9,7 +9,6 @@ Above we would set the high bit as signal bit to read the next byte. e.g 136 -> 
 
 */
 
-
 #![feature(test)]
 
 #[cfg(test)]
@@ -18,17 +17,17 @@ extern crate rand;
 #[cfg(test)]
 extern crate bincode;
 #[cfg(test)]
-extern crate byteorder;
-#[cfg(test)]
 extern crate bitpacking;
+#[cfg(test)]
+extern crate byteorder;
 
 extern crate itertools;
 
-pub mod vint;
-pub mod vint_encode_most_common;
 pub mod average_delta_encoded;
 pub mod bitpacked_ra;
 pub mod bitpacked_ra_step;
+pub mod vint;
+pub mod vint_encode_most_common;
 
 mod util;
 
@@ -64,7 +63,7 @@ mod tests {
         let mut vint = VIntArray::default();
 
         // let dat:Vec<u32> = vec![10, 23, 788, 1, 1, 300, 1,  1, 1, 1, 1,];
-        let dat:Vec<u32> = (0..128).map(|x| (x * 13)  + 4_000_307).collect();
+        let dat: Vec<u32> = (0..128).map(|x| (x * 13) + 4_000_307).collect();
         vint.encode_vals(&dat);
 
         use bincode::serialize;
@@ -72,25 +71,15 @@ mod tests {
         use std::io::prelude::*;
 
         let encoded: Vec<u8> = serialize(&dat).unwrap();
-        File::create("check_size_bincode")
-            .unwrap()
-            .write_all(&encoded)
-            .unwrap();
+        File::create("check_size_bincode").unwrap().write_all(&encoded).unwrap();
 
-        File::create("check_size_vint")
-            .unwrap()
-            .write_all(&vint.serialize())
-            .unwrap();
+        File::create("check_size_vint").unwrap().write_all(&vint.serialize()).unwrap();
 
         let mut vint_common = VIntArrayEncodeMostCommon::default();
         vint_common.encode_vals(&dat);
-        File::create("check_size_vint_common")
-            .unwrap()
-            .write_all(&vint_common.serialize())
-            .unwrap();
+        File::create("check_size_vint_common").unwrap().write_all(&vint_common.serialize()).unwrap();
 
-
-        use bitpacking::{BitPacker4x, BitPacker};
+        use bitpacking::{BitPacker, BitPacker4x};
         // Detects if `SSE3` is available on the current computed
         // and uses the best available implementation accordingly.
         let bitpacker = BitPacker4x::new();
@@ -102,17 +91,12 @@ mod tests {
         // The compressed array will take exactly `num_bits * BitPacker4x::BLOCK_LEN / 8`.
         // But it is ok to have an output with a different len as long as it is larger
         // than this.
-        let mut compressed:Vec<u8> = vec![0u8; num_bits as usize * BitPacker4x::BLOCK_LEN / 8];
+        let mut compressed: Vec<u8> = vec![0u8; num_bits as usize * BitPacker4x::BLOCK_LEN / 8];
 
         // Compress returns the len.
         let _compressed_len = bitpacker.compress(&dat, &mut compressed[..], num_bits);
 
-        File::create("check_size_bitpack")
-            .unwrap()
-            .write_all(&compressed)
-            .unwrap();
-
+        File::create("check_size_bitpack").unwrap().write_all(&compressed).unwrap();
     }
-
 
 }

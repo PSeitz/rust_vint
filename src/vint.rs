@@ -1,19 +1,20 @@
-use std::iter::FusedIterator;
+use std::io;
 use std::io::Read;
 use std::io::Write;
-use std::io;
+use std::iter::FusedIterator;
 
 #[inline(always)]
-pub fn encode_varint_into(output: &mut Vec<u8>, mut value:u32) {
-    let do_one = |output: &mut Vec<u8>, value:&mut u32| {
+pub fn encode_varint_into(output: &mut Vec<u8>, mut value: u32) {
+    let do_one = |output: &mut Vec<u8>, value: &mut u32| {
         output.push(((*value & 127) | 128) as u8);
         *value >>= 7;
     };
-    let do_last = |output: &mut Vec<u8>, value:u32| {
+    let do_last = |output: &mut Vec<u8>, value: u32| {
         output.push((value & 127) as u8);
     };
 
-    if value < 1 << 7 { //128
+    if value < 1 << 7 {
+        //128
         do_last(output, value);
     } else if value < 1 << 14 {
         do_one(output, &mut value);
@@ -37,18 +38,19 @@ pub fn encode_varint_into(output: &mut Vec<u8>, mut value:u32) {
 }
 
 #[inline(always)]
-pub fn encode_varint_into_writer<W:Write>(mut output: W, mut value:u32) -> Result<(), io::Error> {
-    let do_one = |output: &mut W, value:&mut u32| -> Result<(), io::Error> {
+pub fn encode_varint_into_writer<W: Write>(mut output: W, mut value: u32) -> Result<(), io::Error> {
+    let do_one = |output: &mut W, value: &mut u32| -> Result<(), io::Error> {
         output.write_all(&[((*value & 127) | 128) as u8])?;
         *value >>= 7;
         Ok(())
     };
-    let do_last = |output: &mut W, value:u32| -> Result<(), io::Error> {
+    let do_last = |output: &mut W, value: u32| -> Result<(), io::Error> {
         output.write_all(&[(value & 127) as u8])?;
         Ok(())
     };
 
-    if value < 1 << 7 { //128
+    if value < 1 << 7 {
+        //128
         do_last(&mut output, value)?;
     } else if value < 1 << 14 {
         do_one(&mut output, &mut value)?;
@@ -93,8 +95,8 @@ fn test_varint() {
     assert_eq!(decode_varint(&mut iter), Some(5000));
     assert_eq!(decode_varint(&mut iter), Some(4_000_000_000));
 
-    let iter = VintArrayIterator{data: &sink, pos:0 };
-    let dat:Vec<_> = iter.collect();
+    let iter = VintArrayIterator { data: &sink, pos: 0 };
+    let dat: Vec<_> = iter.collect();
     assert_eq!(dat, vec![5, 127, 128, 50, 500, 5000, 4_000_000_000]);
 
     use std::io::BufReader;
@@ -110,8 +112,8 @@ fn test_varint() {
 }
 
 #[inline(always)]
-pub fn decode_varint<I: Iterator<Item=u8>>(input: &mut I) -> Option<u32> {
-    let mut ret:u32 = 0;
+pub fn decode_varint<I: Iterator<Item = u8>>(input: &mut I) -> Option<u32> {
+    let mut ret: u32 = 0;
     if let Some(next) = input.next() {
         ret |= u32::from(next) & 127;
         if next & 128 == 0 {
@@ -135,14 +137,13 @@ pub fn decode_varint<I: Iterator<Item=u8>>(input: &mut I) -> Option<u32> {
         let next = input.next().unwrap();
         ret |= (u32::from(next) & 127) << 28;
         return Some(ret);
-    }else{
+    } else {
         return None;
     }
-
 }
 
 #[inline(always)]
-pub fn decode_from_reader<R:Read>(r:&mut R) -> Option<u32> {
+pub fn decode_from_reader<R: Read>(r: &mut R) -> Option<u32> {
     let mut iter = r.bytes().map(|el| el.unwrap());
     decode_varint(&mut iter)
 }
@@ -160,11 +161,11 @@ impl<'a> VintArrayIterator<'a> {
     }
 
     #[inline]
-    pub fn from_slice(data:&'a [u8]) -> Self {
+    pub fn from_slice(data: &'a [u8]) -> Self {
         let mut iter = VintArrayIterator::new(data);
         if let Some(size) = iter.next() {
-            VintArrayIterator::new(&data[iter.pos .. iter.pos + size as usize])
-        }else{
+            VintArrayIterator::new(&data[iter.pos..iter.pos + size as usize])
+        } else {
             VintArrayIterator::new(&data[..0])
         }
     }
@@ -178,10 +179,9 @@ impl<'a> Iterator for VintArrayIterator<'a> {
         if self.pos == self.data.len() {
             None
         } else {
-
             let next = self.data[self.pos];
             self.pos += 1;
-            let mut ret:u32 = u32::from(next) & 127;
+            let mut ret: u32 = u32::from(next) & 127;
             if next & 128 == 0 {
                 return Some(ret);
             }
@@ -216,10 +216,7 @@ impl<'a> Iterator for VintArrayIterator<'a> {
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (
-            self.data.len() - self.pos / 2,
-            Some(self.data.len() - self.pos),
-        )
+        (self.data.len() - self.pos / 2, Some(self.data.len() - self.pos))
     }
 }
 
@@ -277,4 +274,3 @@ fn test_serialize() {
     let decoded_data: Vec<u32> = iter.collect();
     assert_eq!(&dat, &decoded_data);
 }
-

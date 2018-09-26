@@ -37,5 +37,5 @@ pub fn is_second_high_bit_set(input: u8) -> bool {
 }
 
 pub fn push_compact(num: u32, data: &mut Vec<u8>) {
-	vint::encode_varint_into(data, num);
+    vint::encode_varint_into(data, num);
 }

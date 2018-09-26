@@ -1,5 +1,5 @@
-use average_delta_encoded::decode_average_encoded_delta;
 use average_delta_encoded;
+use average_delta_encoded::decode_average_encoded_delta;
 use std::ptr::copy_nonoverlapping;
 
 #[derive(Debug)]
@@ -34,12 +34,11 @@ use std::mem::transmute;
 
 #[inline]
 pub fn encode_vals_bitpacked_average_endcoded(vals: &[u32]) -> EncodingInfo {
-
     let delta_info = average_delta_encoded::delta_and_average_encode(vals);
     let max_val = *delta_info.data.iter().max().unwrap() as u32;
     let bytes_required = get_bytes_required(max_val);
 
-    let mut encoded:Vec<u8> = vec![];
+    let mut encoded: Vec<u8> = vec![];
     let total_num_bytes = bytes_required as usize * delta_info.data.len();
     encoded.resize(1 + total_num_bytes, 0);
     for (i, val) in delta_info.data.iter().enumerate() {
@@ -49,13 +48,18 @@ pub fn encode_vals_bitpacked_average_endcoded(vals: &[u32]) -> EncodingInfo {
         // encoded[first_block .. first_block + bytes_required as usize].copy_from_slice(&data[.. bytes_required as usize]);
 
         unsafe {
-            copy_nonoverlapping(data.as_ptr(), encoded[first_block ..].as_mut_ptr(), bytes_required as usize);
+            copy_nonoverlapping(data.as_ptr(), encoded[first_block..].as_mut_ptr(), bytes_required as usize);
         }
     }
 
     // println!("encoded {:?}", encoded);
 
-    EncodingInfo{avg_increase: delta_info.avg_increase, offset: delta_info.offset, encoded, bytes_per_element:bytes_required}
+    EncodingInfo {
+        avg_increase: delta_info.avg_increase,
+        offset: delta_info.offset,
+        encoded,
+        bytes_per_element: bytes_required,
+    }
 }
 
 // pub fn decode_bit_packed_val(val: &[u8], num_bits: u8, index: usize) -> u32 {
@@ -68,7 +72,7 @@ pub fn decode_bit_packed_val(info: &EncodingInfo, index: usize) -> u32 {
     // let bytes_slice = &info.encoded[bit_pos_start .. bit_pos_end];
 
     let bit_pos_start = index * info.bytes_per_element as usize;
-    let bytes_slice = &info.encoded[bit_pos_start ..];
+    let bytes_slice = &info.encoded[bit_pos_start..];
 
     let mut out: u32 = 0;
     unsafe {
@@ -77,7 +81,6 @@ pub fn decode_bit_packed_val(info: &EncodingInfo, index: usize) -> u32 {
 
     // decode_average_encoded_delta()
     decode_average_encoded_delta(out as i32, index, info.offset, info.avg_increase)
-
 }
 
 // #[test]
@@ -91,8 +94,3 @@ pub fn decode_bit_packed_val(info: &EncodingInfo, index: usize) -> u32 {
 //     // assert_eq!(decode_bit_packed_val(&info, 0), 150);
 //     assert_eq!(decode_bit_packed_val(&info, 2), 175);
 // }
-
-
-
-
-

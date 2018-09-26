@@ -18,28 +18,26 @@ fn get_required_num_bits(v: u32) -> u8 {
 
 #[inline]
 pub fn encode_vals_bitpacked_average_endcoded(vals: &[u32]) -> EncodingInfo {
-
     let delta = average_delta_encoded::delta_and_average_encode(vals);
     println!("{:?}", delta);
     let max_val = *delta.data.iter().max().unwrap() as u32;
     let num_bits = get_required_num_bits(max_val);
-    if num_bits == 0{
-
-    }
+    if num_bits == 0 {}
     println!("max_val {:?}", max_val);
     println!("num_bits {:?}", num_bits);
-    let mut encoded:Vec<u32> = vec![];
+    let mut encoded: Vec<u32> = vec![];
     let total_num_bits = num_bits as usize * delta.data.len();
-    encoded.resize(1 + total_num_bits/32, 0);
+    encoded.resize(1 + total_num_bits / 32, 0);
     for (i, val) in delta.data.iter().enumerate() {
         let bit_pos = i * num_bits as usize;
         println!("bit_pos {:?}", bit_pos);
-        if bit_pos / 32 != (bit_pos + num_bits as usize) / 32 { // hits number border
+        if bit_pos / 32 != (bit_pos + num_bits as usize) / 32 {
+            // hits number border
 
-        }else{
+        } else {
             let closest_block = bit_pos - bit_pos % 32;
             // println!("closest_block {:?}", closest_block);
-            let shifted_val =  (*val as u32) << (bit_pos % 32);
+            let shifted_val = (*val as u32) << (bit_pos % 32);
             // let block = bit_pos / 32;
             encoded[closest_block as usize] |= shifted_val;
         }
@@ -47,12 +45,16 @@ pub fn encode_vals_bitpacked_average_endcoded(vals: &[u32]) -> EncodingInfo {
 
     // println!("encoded {:?}", encoded);
 
-    EncodingInfo{avg_increase: delta.avg_increase, offset: delta.offset, encoded, num_bits}
+    EncodingInfo {
+        avg_increase: delta.avg_increase,
+        offset: delta.offset,
+        encoded,
+        num_bits,
+    }
 }
 
-
-use std::mem::transmute;
 use std;
+use std::mem::transmute;
 
 #[inline]
 pub fn vec_with_size_uninitialized<T>(size: usize) -> Vec<T> {
@@ -71,7 +73,7 @@ pub fn vec_to_bytes_u32(data: &[u32]) -> Vec<u8> {
     // LittleEndian::write_u32_into(data, &mut wtr);
     // wtr
 
-    let mut out:Vec<u8> = Vec::with_capacity(data.len() * std::mem::size_of::<u32>());
+    let mut out: Vec<u8> = Vec::with_capacity(data.len() * std::mem::size_of::<u32>());
     for el in data {
         let block: [u8; 4] = unsafe { transmute(*el) };
         out.extend(block.iter());
@@ -117,13 +119,8 @@ pub fn vec_to_bytes_u32(data: &[u32]) -> Vec<u8> {
 
 #[test]
 fn test_ra_encode_bitpacked_monotone() {
-    let info:EncodingInfo = encode_vals_bitpacked_average_endcoded(&[150, 170, 175]);
+    let info: EncodingInfo = encode_vals_bitpacked_average_endcoded(&[150, 170, 175]);
 
     let _bytes = vec_to_bytes_u32(&info.encoded);
     // decode_bit_packed_val(&bytes, info.num_bits, 3);
 }
-
-
-
-
-

@@ -8,8 +8,8 @@ extern crate snap;
 
 use byteorder::{ByteOrder, LittleEndian};
 
-use vint::vint_encode_most_common::*;
 use vint::vint::*;
+use vint::vint_encode_most_common::*;
 // use vint::vint_fixed::*;
 
 use criterion::Criterion;
@@ -17,7 +17,6 @@ use criterion::*;
 
 use std::io::BufReader;
 // use std::io::BufWriter;
-
 
 #[inline]
 pub fn vec_with_size_uninitialized<T>(size: usize) -> Vec<T> {
@@ -34,15 +33,11 @@ fn vec_to_bytes_u32(data: &[u32]) -> Vec<u8> {
 }
 
 fn bytes_to_vec_u32(data: &[u8]) -> Vec<u32> {
-    let mut out_dat: Vec<u32> =
-        vec_with_size_uninitialized(data.len() / std::mem::size_of::<u32>());
+    let mut out_dat: Vec<u32> = vec_with_size_uninitialized(data.len() / std::mem::size_of::<u32>());
     unsafe {
         //DANGER ZIOONNE
         let ptr = std::mem::transmute::<*const u8, *const u32>(data.as_ptr());
-        ptr.copy_to_nonoverlapping(
-            out_dat.as_mut_ptr(),
-            data.len() / std::mem::size_of::<u32>(),
-        );
+        ptr.copy_to_nonoverlapping(out_dat.as_mut_ptr(), data.len() / std::mem::size_of::<u32>());
     }
     out_dat
 }
@@ -76,84 +71,80 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     let parameters = vec![1, 2, 25, 250, 2_500, 25_000, 250_000, 2_500_000];
     let benchmark = ParameterizedBenchmark::new(
-        "vint", |b, i| {
+        "vint",
+        |b, i| {
             let mut vint = VIntArray::default();
             for i in 0..*i {
                 vint.encode(pseudo_rand(i));
             }
             b.iter(|| vint.iter().collect::<Vec<u32>>())
-        }
-        , parameters)
-        .with_function("vint reader", |b, i| {
+        },
+        parameters,
+    ).with_function("vint reader", |b, i| {
+        let sink = (0..*i).fold(vec![], |mut sink, val| {
+            encode_varint_into(&mut sink, pseudo_rand(val));
+            sink
+        });
 
-            let sink = (0..*i).fold(vec![], |mut sink, val| {
-                encode_varint_into(&mut sink, pseudo_rand(val));
-                sink
-            });
-
-            b.iter(|| {
-                let mut vals: Vec<u32> = vec![];
-                let mut reader = BufReader::new(&sink[..]);
-                while let Some(val) = decode_from_reader(reader.get_mut()) {
-                    vals.push(val);
-                }
-                vals
-            })
-        })
-        .with_function("baseline", |b, i| {
-            let mut data: Vec<u32> = vec![];
-            for i in 0..*i {
-                data.push(pseudo_rand(i));
+        b.iter(|| {
+            let mut vals: Vec<u32> = vec![];
+            let mut reader = BufReader::new(&sink[..]);
+            while let Some(val) = decode_from_reader(reader.get_mut()) {
+                vals.push(val);
             }
-            b.iter(|| data.iter().cloned().collect::<Vec<u32>>())
+            vals
         })
-        // .with_function("mayda", |b, i| {
-        //     use mayda::{Access, Encode, Monotone};
-        //     let dat: Vec<u32> = (0..*i).map(|i| pseudo_rand(i)).collect();
-        //     let mut bits = Monotone::new();
-        //     bits.encode(&dat).unwrap();
-
-        //     b.iter(|| bits.decode())
-        // })
-        // .with_function("snappy",
-        // |b, i| {
-        //     let mut data: Vec<u32> = vec![];
-        //     for i in 0..*i {
-        //         data.push(pseudo_rand(i));
-        //     }
-        //     let dat = snappy_encode(&data);
-        //     b.iter(|| {
-        //         let mut decoder = snap::Decoder::new();
-        //         bytes_to_vec_u32(&decoder.decompress_vec(&dat).unwrap())
-        //     });
-        // })
-        
-        .with_function("vint most common", |b, i| {
-            let mut vint = VIntArrayEncodeMostCommon::default();
-            let values: Vec<u32> = (0..*i).map(|i| pseudo_rand(i)).collect();
-            vint.encode_vals(&values);
-            b.iter(|| vint.iter().collect::<Vec<u32>>())
-        })
-        .plot_config(plot_config)
-        .throughput(|s| Throughput::Bytes(s * 4 as u32));
+    }).with_function("baseline", |b, i| {
+        let mut data: Vec<u32> = vec![];
+        for i in 0..*i {
+            data.push(pseudo_rand(i));
+        }
+        b.iter(|| data.iter().cloned().collect::<Vec<u32>>())
+    })
+    // .with_function("mayda", |b, i| {
+    //     use mayda::{Access, Encode, Monotone};
+    //     let dat: Vec<u32> = (0..*i).map(|i| pseudo_rand(i)).collect();
+    //     let mut bits = Monotone::new();
+    //     bits.encode(&dat).unwrap();
+    //     b.iter(|| bits.decode())
+    // })
+    // .with_function("snappy",
+    // |b, i| {
+    //     let mut data: Vec<u32> = vec![];
+    //     for i in 0..*i {
+    //         data.push(pseudo_rand(i));
+    //     }
+    //     let dat = snappy_encode(&data);
+    //     b.iter(|| {
+    //         let mut decoder = snap::Decoder::new();
+    //         bytes_to_vec_u32(&decoder.decompress_vec(&dat).unwrap())
+    //     });
+    // })
+    .with_function("vint most common", |b, i| {
+        let mut vint = VIntArrayEncodeMostCommon::default();
+        let values: Vec<u32> = (0..*i).map(|i| pseudo_rand(i)).collect();
+        vint.encode_vals(&values);
+        b.iter(|| vint.iter().collect::<Vec<u32>>())
+    }).plot_config(plot_config)
+    .throughput(|s| Throughput::Bytes(s * 4 as u32));
     c.bench("decode throughput, max_val 16_000", benchmark);
-
-
 
     let plot_config = PlotConfiguration::default().summary_scale(AxisScale::Logarithmic);
     let parameters = vec![1, 2, 5, 25, 250, 2_500, 25_000, 250_000];
-    let benchmark = ParameterizedBenchmark::new("vint", |b, i| {
+    let benchmark = ParameterizedBenchmark::new(
+        "vint",
+        |b, i| {
+            b.iter(|| {
+                let mut vint = VIntArray::default();
+                for i in 0..*i {
+                    vint.encode(pseudo_rand(i));
+                }
+                vint
+            })
+        },
+        parameters,
+    ).with_function("vint", |b, i| {
         b.iter(|| {
-            let mut vint = VIntArray::default();
-            for i in 0..*i {
-                vint.encode(pseudo_rand(i));
-            }
-            vint
-        })
-    }, parameters)
-    .with_function("vint", |b, i| {
-        b.iter(|| {
-
             let mut sink = vec![];
             for i in 0..*i {
                 encode_varint_into(&mut sink, pseudo_rand(i))
@@ -165,10 +156,9 @@ fn criterion_benchmark(c: &mut Criterion) {
             // vint.encode_vals(&values);
             // vint
         })
-    })
-    .with_function("baseline", |b, i| {
+    }).with_function("baseline", |b, i| {
         b.iter(|| {
-            let mut data:Vec<u32> = vec![];
+            let mut data: Vec<u32> = vec![];
             for i in 0..*i {
                 data.push(pseudo_rand(i));
             }
@@ -187,13 +177,11 @@ fn criterion_benchmark(c: &mut Criterion) {
     .with_function("vint most common", |b, i| {
         b.iter(|| {
             let mut vint = VIntArrayEncodeMostCommon::default();
-            let values:Vec<u32> = (0..*i).map(|i| pseudo_rand(i)).collect();
+            let values: Vec<u32> = (0..*i).map(|i| pseudo_rand(i)).collect();
             vint.encode_vals(&values);
             vint
         })
-    })
-    
-    .plot_config(plot_config)
+    }).plot_config(plot_config)
     .throughput(|s| Throughput::Bytes(s * 4 as u32));
 
     c.bench("encode throughput, max_val 16_000", benchmark);
