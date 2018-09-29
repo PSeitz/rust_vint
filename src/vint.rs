@@ -161,7 +161,7 @@ impl<'a> VintArrayIterator<'a> {
     }
 
     #[inline]
-    pub fn from_slice(data: &'a [u8]) -> Self {
+    pub fn from_serialized_vint_array(data: &'a [u8]) -> Self {
         let mut iter = VintArrayIterator::new(data);
         if let Some(size) = iter.next() {
             VintArrayIterator::new(&data[iter.pos..iter.pos + size as usize])
@@ -228,6 +228,13 @@ pub struct VIntArray {
 }
 
 impl VIntArray {
+    #[inline]
+    pub fn from_vals(vals: &[u32]) -> VIntArray {
+        let mut vals = VIntArray::default();
+        vals.encode_vals(vals);
+        vals
+    }
+
     #[inline]
     pub fn encode_vals(&mut self, vals: &[u32]) {
         for val in vals {
