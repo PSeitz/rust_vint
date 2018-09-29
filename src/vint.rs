@@ -243,6 +243,11 @@ impl VIntArray {
     }
 
     #[inline]
+    pub fn encode_val(&mut self, val: u32) {
+        encode_varint_into(&mut self.data, val);
+    }
+
+    #[inline]
     pub fn serialize(&self) -> Vec<u8> {
         let mut serialized = Vec::with_capacity(self.data.len() + 4);
         encode_varint_into(&mut serialized, self.data.len() as u32);
