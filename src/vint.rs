@@ -230,9 +230,9 @@ pub struct VIntArray {
 impl VIntArray {
     #[inline]
     pub fn from_vals(vals: &[u32]) -> VIntArray {
-        let mut vals = VIntArray::default();
-        vals.encode_vals(vals);
-        vals
+        let mut arr = VIntArray::default();
+        arr.encode_vals(vals);
+        arr
     }
 
     #[inline]
