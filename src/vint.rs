@@ -143,6 +143,46 @@ pub fn decode_varint<I: Iterator<Item = u8>>(input: &mut I) -> Option<u32> {
 }
 
 #[inline(always)]
+pub fn decode_varint_slice(data: &[u8], pos: &mut usize) -> Option<u32> {
+    if *pos == data.len() {
+        None
+    } else {
+        let next = data[*pos];
+        *pos += 1;
+        let mut ret: u32 = u32::from(next) & 127;
+        if next & 128 == 0 {
+            return Some(ret);
+        }
+        let next = data[*pos];
+        *pos += 1;
+        let mut shift_by = 7;
+        ret |= (u32::from(next) & 127) << shift_by;
+        if next & 128 == 0 {
+            return Some(ret);
+        }
+        let next = data[*pos];
+        *pos += 1;
+        shift_by += 7;
+        ret |= (u32::from(next) & 127) << shift_by;
+        if next & 128 == 0 {
+            return Some(ret);
+        }
+        let next = data[*pos];
+        *pos += 1;
+        shift_by += 7;
+        ret |= (u32::from(next) & 127) << shift_by;
+        if next & 128 == 0 {
+            return Some(ret);
+        }
+        let next = data[*pos];
+        *pos += 1;
+        shift_by += 7;
+        ret |= (u32::from(next) & 127) << shift_by;
+        Some(ret)
+    }
+}
+
+#[inline(always)]
 pub fn decode_from_reader<R: Read>(r: &mut R) -> Option<u32> {
     let mut iter = r.bytes().map(|el| el.unwrap());
     decode_varint(&mut iter)
@@ -176,42 +216,7 @@ impl<'a> Iterator for VintArrayIterator<'a> {
 
     #[inline(always)]
     fn next(&mut self) -> Option<u32> {
-        if self.pos == self.data.len() {
-            None
-        } else {
-            let next = self.data[self.pos];
-            self.pos += 1;
-            let mut ret: u32 = u32::from(next) & 127;
-            if next & 128 == 0 {
-                return Some(ret);
-            }
-            let next = self.data[self.pos];
-            self.pos += 1;
-            let mut shift_by = 7;
-            ret |= (u32::from(next) & 127) << shift_by;
-            if next & 128 == 0 {
-                return Some(ret);
-            }
-            let next = self.data[self.pos];
-            self.pos += 1;
-            shift_by += 7;
-            ret |= (u32::from(next) & 127) << shift_by;
-            if next & 128 == 0 {
-                return Some(ret);
-            }
-            let next = self.data[self.pos];
-            self.pos += 1;
-            shift_by += 7;
-            ret |= (u32::from(next) & 127) << shift_by;
-            if next & 128 == 0 {
-                return Some(ret);
-            }
-            let next = self.data[self.pos];
-            self.pos += 1;
-            shift_by += 7;
-            ret |= (u32::from(next) & 127) << shift_by;
-            Some(ret)
-        }
+        decode_varint_slice(self.data, &mut self.pos)
     }
 
     #[inline]
@@ -282,7 +287,7 @@ fn test_serialize() {
 
     let data = vint.serialize();
 
-    let iter = VintArrayIterator::from_slice(&data);
+    let iter = VintArrayIterator::from_serialized_vint_array(&data);
     let decoded_data: Vec<u32> = iter.collect();
     assert_eq!(&dat, &decoded_data);
 }
