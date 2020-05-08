@@ -11,20 +11,14 @@ itertools = "0.7.8"
 
 [dev-dependencies]
 bincode = "1.0.1"
-bitfield = "0.13.0"
 bitpacking = "0.5.1"
 byteorder = "1.2.6"
-criterion = "0.2.5"
-quickcheck = "0.7.1"
-quickcheck_macros = "0.7.0"
+criterion = "0.3"
+quickcheck = "0.9"
+quickcheck_macros = "0.9"
 rand = "0.5.5"
 serde = "1.0.79"
 serde_bytes = "0.10.4"
 serde_derive = "1.0.79"
 snap = "0.2.5"
 
-[profile.bench]
-codegen-units = 1
-lto = true
-opt-level = 3
-panic = "unwind"
